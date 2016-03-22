@@ -3,6 +3,7 @@ from cvxpy import *
 import numpy as np
 from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
+from itertools import product
 
 
 """
@@ -10,6 +11,8 @@ tests:
 weights sum to 1, are all positive and <= 1
 equal weight == highly regularized
 optimal weight == barely regularized
+test results are same for both norm types when alpha is zero
+raises exception if df contains nan
 """
 
 def calc_opt_weights(df, alpha=0, norm_type=2):    
@@ -21,6 +24,9 @@ def calc_opt_weights(df, alpha=0, norm_type=2):
     returns:
         pd.Series of optimal weights
     """
+    if df.isnull().values.any():
+        raise ValueError("dataframe cannot contain nans")
+
     X = df.values
     y = np.ones(df.shape[0])
 
@@ -48,3 +54,22 @@ def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
              filter(lambda x: x + look_ahead_per < num_rows),
              map(lambda x: {df.index[x]: opt_weights_func(df.iloc[x:x+look_ahead_per])}))
     return pd.DataFrame(merge(p)).T
+
+def calc_cum_rets(df, alpha, norm_type, look_ahead_per):
+    """calculates cumulative returns for optimal portfolio 
+    determined by alpha, norm_type, look_ahead_per"""
+    opt_weights_func = lambda x: calc_opt_weights(x, alpha=alpha, norm_type=norm_type)
+    weights = rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per=look_ahead_per)
+    return (df * weights).sum(axis=1).cumprod()
+
+def cum_prod_grid(df, alphas=np.exp(np.linspace(-10, 2, 10)), 
+                  look_ahead_pers=xrange(1,30,5)):
+    """exhaustive grid search over alphas, look_ahead_per, norm_types 
+    returning dataframe of cumulative returns for each optimal portfolio construction"""
+    norm_types = [1,2]
+    end_date = df.index[-(look_ahead_pers[-1] + 1)]
+    p = pipe(product(alphas, norm_types, look_ahead_pers),
+             map(lambda x: list(x) + [calc_cum_rets(df, x[0], x[1], x[2])]),
+             map(lambda x: x[:-1] + [x[-1][:end_date].tail(1).values[0]]),
+             map(lambda x: dict(zip(['alpha', 'norm_type', 'look_ahead_per', 'cum_ret'], x))))
+    return pd.DataFrame(list(p))
