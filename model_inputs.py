@@ -55,12 +55,12 @@ def validate_and_format_Xs_ys(Xs, ys):
     ind = pd.DatetimeIndex(sorted(set(Xs.index) & set(ys.index)))
     return Xs.ix[ind], ys.ix[ind]
 
-def split_Xs_ys(Xs, ys, split_date, buffer_days=0):
+def split_inputs_by_date(Xs, ys, split_date, buffer_days=0):
     """splits Xs and ys by 'split_date' + 'buffer_days'"""
     split_date_shifted = split_date + datetime.timedelta(days=buffer_days)
-    Xs_a = Xs[:split_date].values
-    ys_a = ys[:split_date].values
-    Xs_b = Xs[split_date_shifted:].values
-    ys_b = ys[split_date_shifted:].values
+    Xs_a = Xs[:split_date]
+    ys_a = ys[:split_date]
+    Xs_b = Xs[split_date_shifted:]
+    ys_b = ys[split_date_shifted:]
     return ((Xs_a, ys_a), (Xs_b, ys_b))
 

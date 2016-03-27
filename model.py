@@ -33,9 +33,8 @@ def tracked_train_step(loss, learning_rate):
     #train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
     return train_step
 
-def train_nn_softmax(Xs, ys, mnist, batch_size, iterations, shape):
+def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate):
 
-    learning_rate = 0.01
     # run tensorboard:
     # ./venv/bin/tensorboard --logdir==/Users/ryanchouck/dev/tf/data/tensor_board
     train_dir = '/Users/ryanchouck/dev/tf/data/tensor_board'
@@ -78,20 +77,21 @@ def train_nn_softmax(Xs, ys, mnist, batch_size, iterations, shape):
             # calculate accuracy on train set
             correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            print('accuracy:\t{0}'.format(sess.run(accuracy, feed_dict)))
-            print('cross entropy:\t{0}'.format(sess.run(loss, feed_dict))) 
+            stats = {'accuracy': sess.run(accuracy, feed_dict),
+                     'cross_entropy': sess.run(loss, feed_dict)}
+            print('accuracy:\t{0}'.format(stats['accuracy']))
+            print('cross entropy:\t{0}'.format(stats['cross_entropy'])) 
 
             # return predictions on train set
             prediction = tf.argmax(y,1)
             max_weight_label = sess.run(prediction, feed_dict)
             weights = sess.run(y, feed_dict)
-            return weights, max_weight_label
+            return weights, max_weight_label, stats
 
-# def predict(sess, Xs):
-#     with sess.as_default():
-#         feed_dict={x: Xs}
-#         prediction=tf.argmax(y,1)
-#         print prediction.eval(feed_dict)
-#         preds = (sess.run(y, feed_dict))
-#         print preds
-#         #pd.DataFrame(preds).plot(alpha=.5)
+def predict(sess, Xs):
+    with sess.as_default():
+        feed_dict={x: Xs}
+        #prediction=tf.argmax(y,1)
+        #print prediction.eval(feed_dict)
+        preds = (sess.run(y, feed_dict))
+        print preds
