@@ -70,3 +70,36 @@ def get_peak_ahead_returns(returns, per):
     fwd_rets = fwd_rets.dropna(how='all')
     return fwd_rets.sub(fwd_rets.mean(axis=1), axis=0)
     #fwd_rets = pd.rolling_mean(returns, per).shift(-per)
+
+def get_multi_freq_historical_returns(returns, per):
+    """create df of returns data for each column over multiple frequencies
+    Args:
+      per: integer - number of returns periods to return
+    """
+    if returns.isnull().values.any():
+        raise ValueError("returns dataframe cannot contain nans")
+
+    cum_rets = returns.cumprod()
+
+    returns_vectors = lambda df, per: df.div(df.shift()).ix[-per:]
+    daily = returns_vectors(cum_rets, per)
+    weekly = returns_vectors(cum_rets.resample('W', how='last'), per)
+    monthly = returns_vectors(cum_rets.resample('M', how='last'), per)
+    quarterly = returns_vectors(cum_rets.resample('Q', how='last'), per)
+    
+    df = pd.concat([daily, weekly, monthly, quarterly])
+    ind_name = df.index.name
+    return df.reset_index().drop(ind_name, 1)
+
+
+def build_Xs_from_returns(returns, per):
+    """builds df containing returns data for all input ids in each row
+    output 
+    """
+        
+    p = pipe(returns.index,
+             map(lambda x: (x, returns[:x])),                          # filter lagged returns by date      
+             map(lambda x: (x[0], get_flat_returns_vecs(x[1], per))),  # create input rows
+             filter(lambda x: np.isnan(x[1]).any()==False),            # drop vectors with nan
+             map(lambda x: {x[0]: pd.Series(x[1], name=x[0])}))        # convert to Series
+    return pd.DataFrame(merge(p)).T
