@@ -35,16 +35,6 @@ def tracked_train_step(loss, learning_rate):
     train_step = optimizer.minimize(loss, global_step=global_step)
     return train_step
 
-def clear_path(path):
-    for the_file in os.listdir(path):
-        file_path = os.path.join(path, the_file)
-        try:
-            if os.path.isfile(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path): shutil.rmtree(file_path)
-        except Exception, e:
-            print e
-
 def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, logdir=None):
 
     with tf.Graph().as_default():
@@ -75,12 +65,11 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, logdi
                 summary_op = tf.merge_all_summaries()
                 summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
             
+            # train on batches
             start_time = time.time()
             init = tf.initialize_all_variables()
             sess.run(init)
             feed_dict={x: Xs, y_: ys}
-            
-            # train on batches
             for i in xrange(iterations):
                 bXs, bys = get_batch(Xs, ys, batch_size)
                 _, loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})

@@ -5,6 +5,16 @@ import numpy as np
 from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
 
+def clear_path(path):
+    """deletes all files and sub dirs in dir (for clearing tensorboard logdir)"""
+    for the_file in os.listdir(path):
+        file_path = os.path.join(path, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path): shutil.rmtree(file_path)
+        except Exception, e:
+            print e
 
 def multi_freq_returns(returns, per):
     """create df of returns data for each column over multiple frequencies
