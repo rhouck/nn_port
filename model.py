@@ -14,7 +14,8 @@ def add_layer(input, name, out_size, activation):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         stddev = 1.0 / math.sqrt(float(in_size))
-        weights = tf.Variable(tf.truncated_normal(weights_dim, stddev=stddev, name='weights'))
+        #weights = tf.Variable(tf.truncated_normal(weights_dim, stddev=stddev, name='weights'))
+        weights = tf.Variable(tf.random_normal(weights_dim, stddev=stddev, name='weights'))
         biases = tf.Variable(tf.zeros([out_size]), name='biases')
         logits = tf.matmul(input, weights) + biases
         return activation(logits) if activation else logits
@@ -38,14 +39,15 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate):
     # run tensorboard:
     # ./venv/bin/tensorboard --logdir==/Users/ryanchouck/dev/tf/data/tensor_board
     train_dir = '/Users/ryanchouck/dev/tf/data/tensor_board'
- 
+
     with tf.Graph().as_default():
 
         x = tf.placeholder(tf.float32, [None, Xs.shape[1]])
         y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
 
         # define model
-        prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.nn.relu)
+        prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid)
+        #prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.nn.relu)
         layers = list(map(prep_hidden, shape))
         layers.append(('softmax_linear', ys.shape[1], None))
         logits = reduce(lambda inp, layer: add_layer(inp, layer[0], layer[1], layer[2]), layers, x)

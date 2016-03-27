@@ -1,4 +1,3 @@
-# confrim peak ahead Xs values leads to high correlation with target
 import unittest
 import datetime
 
@@ -57,3 +56,9 @@ class TestModel(unittest.TestCase):
         inp = self.ys_labels.values
         _, _, stats  = md.train_nn_softmax(inp, inp, [10,], 1000, 100, .1)
         self.assertTrue(stats['accuracy'] > .99)
+
+    def test_single_softmax_learns_opt_weights_w_perfect_foresight(self):
+        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
+        probs, _, _ = md.train_nn_softmax(ys.values, ys.values, [], 2000, 1000, .4)
+        probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
+        self.assertTrue(probs.stack().corr(ys.stack()) > .95)        

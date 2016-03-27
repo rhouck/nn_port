@@ -6,7 +6,7 @@ from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
 
 
-def combined_return_vectors(returns, per):
+def multi_freq_returns(returns, per):
     """create df of returns data for each column over multiple frequencies
     Args:
       per: integer - number of returns periods to return
@@ -36,16 +36,16 @@ def build_Xs_from_returns(returns, per):
     """builds df containing returns data for all input ids in each row
     output 
     """
-    def flat_vecs(returns, per):
-        return (combined_return_vectors(returns, per)
+    def get_flat_returns_vecs(returns, per):
+        return (multi_freq_returns(returns, per)
                 .values.flatten())
     
     lagged_returns = returns.shift().dropna(how='all')
     p = pipe(lagged_returns.index,
-             map(lambda x: (x, lagged_returns[:x])),              # filter lagged returns by date      
-             map(lambda x: (x[0], flat_vecs(x[1], per))),         # create input rows
-             filter(lambda x: np.isnan(x[1]).any()==False),       # drop vectors with nan
-             map(lambda x: {x[0]: pd.Series(x[1], name=x[0])}))   # convert to Series
+             map(lambda x: (x, lagged_returns[:x])),                   # filter lagged returns by date      
+             map(lambda x: (x[0], get_flat_returns_vecs(x[1], per))),  # create input rows
+             filter(lambda x: np.isnan(x[1]).any()==False),            # drop vectors with nan
+             map(lambda x: {x[0]: pd.Series(x[1], name=x[0])}))        # convert to Series
     return pd.DataFrame(merge(p)).T
 
 def validate_and_format_Xs_ys(Xs, ys):
