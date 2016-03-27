@@ -40,9 +40,9 @@ def build_Xs_from_returns(returns, per):
         return (multi_freq_returns(returns, per)
                 .values.flatten())
     
-    lagged_returns = returns.shift().dropna(how='all')
-    p = pipe(lagged_returns.index,
-             map(lambda x: (x, lagged_returns[:x])),                   # filter lagged returns by date      
+    #lagged_returns = returns.shift().dropna(how='all')
+    p = pipe(returns.index,
+             map(lambda x: (x, returns[:x])),                          # filter lagged returns by date      
              map(lambda x: (x[0], get_flat_returns_vecs(x[1], per))),  # create input rows
              filter(lambda x: np.isnan(x[1]).any()==False),            # drop vectors with nan
              map(lambda x: {x[0]: pd.Series(x[1], name=x[0])}))        # convert to Series
