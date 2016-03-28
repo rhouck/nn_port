@@ -9,7 +9,16 @@ def get_batch(Xs, ys, batch_size):
     inds = np.random.choice(Xs.shape[0], batch_size, replace=True)
     return Xs[inds,:], ys[inds,:]
 
-def add_layer(input, name, out_size, activation):
+def get_penalties(items, name, alpha):
+    """returns penalties for a given set of weights or biases"""
+    #penalty_func = tf.contrib.layers.l2_regularizer(alpha)
+    #penalties = penalty_func(items, name=name)
+    penalties = tf.nn.l2_loss(items) * alpha
+    name = 'l2_{0}_pen'.format(name)
+    _ = tf.histogram_summary(name, penalties)
+    return penalties
+
+def add_layer(input, name, out_size, activation, alpha):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
@@ -19,7 +28,11 @@ def add_layer(input, name, out_size, activation):
         logits = tf.matmul(input, weights) + biases
         _ = tf.histogram_summary('weights', weights)
         _ = tf.histogram_summary('biases', biases)
-        return activation(logits) if activation else logits
+
+        i = ((weights, 'weights'), (biases, 'biases'))
+        penalties = map(lambda x: get_penalties(x[0], x[1], alpha), i)
+        response = activation(logits) if activation else logits
+        return response, penalties
 
 def calc_loss(logits, y_):
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name='xentropy')
@@ -43,15 +56,16 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, logdi
             y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
 
             # define model
-            prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid)
+            prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid, .1)
             layers = list(map(prep_hidden, shape))
-            layers.append(('softmax_linear', ys.shape[1], None))
-            logits = reduce(lambda inp, layer: add_layer(inp, layer[0], layer[1], layer[2]), layers, x)
+            layers.append(('softmax_linear', ys.shape[1], None, 0.))
+            logits = reduce(lambda inp, layer: add_layer(inp, layer[0], layer[1], layer[2], layer[3])[0], 
+                            layers, x)
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
               
             # set up objective
-            loss = calc_loss(logits, y_)
+            loss = calc_loss(logits, y_)# + penalties
             train_step = tracked_train_step(loss, learning_rate)
             _ = tf.scalar_summary('cross_entropy', loss)
             

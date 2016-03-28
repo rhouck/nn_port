@@ -47,5 +47,26 @@ class TestModel(unittest.TestCase):
     def test_single_softmax_learns_opt_weights_w_perfect_foresight(self):
         ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
         probs, _, _ = md.train_nn_softmax(ys.values, ys.values, [], 2000, 1000, .4)
-        #probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
-        #self.assertTrue(probs.stack().corr(ys.stack()) > .95)        
+        probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
+        self.assertTrue(probs.stack().corr(ys.stack()) > .95) 
+
+    def test_noise_input_leads_to_stable_label_pred_based_on_max_val_freqs(self):
+        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
+        Xs = gen_random_normal(ys.index, 20)
+        probs, _, _ = md.train_nn_softmax(Xs.values, ys.values, [], 1000, 100, .1)
+        probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
+        prob_ranks = probs.rank(axis=1).mean(axis=0).sort_values(ascending=False).index
+        cols = list(ys.columns)
+        cols = dict(map(lambda x: (cols.index(x), x), cols))
+        actual_ranks = ys.apply(lambda x: list(x).index(max(x)), axis=1).map(lambda x: cols[x]).value_counts().index
+        a = range(len(actual_ranks))
+        b = list(map(lambda x: list(actual_ranks).index(x), list(prob_ranks)))
+        self.assertEquals(a[0], b[0])
+        rank_corr = pd.DataFrame([a, b]).T.corr(method='spearman').iloc[0,1]
+        self.assertTrue(rank_corr > .5)
+        
+      
+    def test_regularization_increases_x_ent_in_train_set(self):
+        self.assertTrue(False)
+
+
