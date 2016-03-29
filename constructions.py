@@ -17,6 +17,7 @@ def gen_random_onehot(date_index, width):
     df_maxs = df.apply(lambda x: list(x).index(max(x)), axis=1)
     return pd.get_dummies(df_maxs)
 
+flatten_df = lambda x: x.values.flatten()
 
 def map_to_date(returns, start_date, func):
     """iteratively apply function to dataframe accross expanding window

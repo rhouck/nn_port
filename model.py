@@ -11,14 +11,12 @@ def get_batch(Xs, ys, batch_size):
 
 def get_penalties(items, name, alpha):
     """returns penalties for a given set of weights or biases"""
-    #penalty_func = tf.contrib.layers.l2_regularizer(alpha)
-    #penalties = penalty_func(items, name=name)
     penalties = tf.nn.l2_loss(items) * alpha
     name = 'l2_{0}_pen'.format(name)
     _ = tf.histogram_summary(name, penalties)
     return penalties
 
-def add_layer(input, name, out_size, activation, alpha):
+def create_layer(input, name, out_size, activation, alpha):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
@@ -28,10 +26,13 @@ def add_layer(input, name, out_size, activation, alpha):
         logits = tf.matmul(input, weights) + biases
         _ = tf.histogram_summary('weights', weights)
         _ = tf.histogram_summary('biases', biases)
-
-        i = ((weights, 'weights'), (biases, 'biases'))
-        penalties = map(lambda x: get_penalties(x[0], x[1], alpha), i)
         response = activation(logits) if activation else logits
+        
+        penalties = []
+        if alpha:
+            i = ((weights, 'weights'), (biases, 'biases'))
+            penalties = map(lambda x: get_penalties(x[0], x[1], alpha), i)
+        
         return response, penalties
 
 def calc_loss(logits, y_):
@@ -46,7 +47,8 @@ def tracked_train_step(loss, learning_rate):
     train_step = optimizer.minimize(loss, global_step=global_step)
     return train_step
 
-def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, logdir=None):
+def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, 
+                     penalty_alpha=0., logdir=None):
 
     with tf.Graph().as_default():
 
@@ -56,16 +58,23 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, logdi
             y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
 
             # define model
-            prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid, .1)
-            layers = list(map(prep_hidden, shape))
-            layers.append(('softmax_linear', ys.shape[1], None, 0.))
-            logits = reduce(lambda inp, layer: add_layer(inp, layer[0], layer[1], layer[2], layer[3])[0], 
-                            layers, x)
+            prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid, penalty_alpha)
+            layer_defs = list(map(prep_hidden, shape))
+            layer_defs.append(('softmax_linear', ys.shape[1], None, 0.))
+            
+            def add_layer_and_pens(inp, layer_def):
+                model, existing_penalties = inp
+                model, new_penalties = create_layer(model, *layer_def)                    
+                penalties = existing_penalties + new_penalties
+                return model, penalties
+
+            logits, penalties = reduce(lambda inp, ld: add_layer_and_pens(inp, ld), layer_defs, (x, []))
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
-              
+             
+
             # set up objective
-            loss = calc_loss(logits, y_)# + penalties
+            loss = calc_loss(logits, y_) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
             _ = tf.scalar_summary('cross_entropy', loss)
             

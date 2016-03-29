@@ -65,8 +65,13 @@ class TestModel(unittest.TestCase):
         rank_corr = pd.DataFrame([a, b]).T.corr(method='spearman').iloc[0,1]
         self.assertTrue(rank_corr > .5)
         
-      
-    def test_regularization_increases_x_ent_in_train_set(self):
-        self.assertTrue(False)
+    def test_regularization_decreases_ability_to_fit_train_set(self):
+        ys = self.ys_labels
+        res = []
+        for penalty_alpha in (0., .1, .5):
+            _, _, stats = md.train_nn_softmax(ys.values, ys.values, [2], 1000, 500, .1, penalty_alpha=penalty_alpha)
+            res.append(1. - stats['accuracy'])
+        self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
+        
 
 
