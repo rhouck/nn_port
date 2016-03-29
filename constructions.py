@@ -25,9 +25,12 @@ def map_to_date(returns, start_date, func):
     (func results should be single dim vector)
     """
     date_index = returns[start_date:].index
-    p = pipe(date_index,
-             map(lambda x: (x, func(returns[:x]))))
-    return pd.DataFrame(dict(p)).T
+    p = dict(pipe(date_index,
+                  map(lambda x: (x, func(returns[:x])))))
+    try:
+        return pd.DataFrame(p).T
+    except:
+        return pd.Panel(p).transpose(0, 2, 1)
 
 def xs_score(df):
     mean = df.mean(axis=1)
