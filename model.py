@@ -112,11 +112,3 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate,
             max_weight_label = sess.run(prediction, feed_dict)
             weights = sess.run(y, feed_dict)
             return weights, max_weight_label, stats
-
-def predict(sess, Xs):
-    with sess.as_default():
-        feed_dict={x: Xs}
-        #prediction=tf.argmax(y,1)
-        #print prediction.eval(feed_dict)
-        preds = (sess.run(y, feed_dict))
-        print preds
