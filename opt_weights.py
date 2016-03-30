@@ -6,15 +6,6 @@ from toolz.dicttoolz import merge
 from itertools import product
 
 
-"""
-tests:
-weights sum to 1, are all positive and <= 1
-equal weight == highly regularized
-optimal weight == barely regularized
-test results are same for both norm types when alpha is zero
-raises exception if df contains nan
-"""
-
 def calc_opt_weights(df, alpha=0, norm_type=2):    
     """returns optimal weights of returns df with optional regularization
     inputs:
@@ -39,14 +30,6 @@ def calc_opt_weights(df, alpha=0, norm_type=2):
     result = prob.solve()
     return pd.Series(np.asarray(w.value).flatten(), index=df.columns)
 
-"""
-tests:
-for each date, never looks back in time
-first date in first iteration is same as frist date in input data frame
-look exits when fewer additional rows than look ahead input 
-(i.e. final date in return df is look_ahead_per less than len of input df)
-applied weights with minimum look ahead outperforms equal weights
-"""
 def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
     """applies opt_weights_func to rolling window on pandas df"""
     num_rows = df.shape[0]
