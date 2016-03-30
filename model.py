@@ -16,7 +16,19 @@ def get_penalties(items, name, alpha):
     _ = tf.histogram_summary(name, penalties)
     return penalties
 
-def create_layer(input, name, out_size, activation, alpha):
+def calc_loss(logits, y_):
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name='xentropy')
+    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+    return loss
+
+def tracked_train_step(loss, learning_rate):
+    _ = tf.scalar_summary(loss.op.name, loss)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    global_step = tf.Variable(0, name='global_step', trainable=False)
+    train_step = optimizer.minimize(loss, global_step=global_step)
+    return train_step
+
+def create_fc_layer(input, name, out_size, activation, alpha):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
@@ -35,20 +47,28 @@ def create_layer(input, name, out_size, activation, alpha):
         
         return response, penalties
 
-def calc_loss(logits, y_):
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name='xentropy')
-    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-    return loss
+def create_conv_layer(input, name, out_size):
+    with tf.name_scope(name):
+        width = input._shape[2]._value
+        initial = tf.truncated_normal([1, width, 1, out_size], stddev=0.1)
+        weights = tf.Variable(initial, name='weights')
+        initial = tf.constant(0.1, shape=[out_size])
+        biases = tf.Variable(initial, name='biases')
+        conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
+        return tf.nn.relu(conv2d + b_conv1)
 
-def tracked_train_step(loss, learning_rate):
-    _ = tf.scalar_summary(loss.op.name, loss)
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    global_step = tf.Variable(0, name='global_step', trainable=False)
-    train_step = optimizer.minimize(loss, global_step=global_step)
-    return train_step
+def flatten_conv_layer():
+    pass
+    #h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+
+def validate_dtype(array):
+    return array.dtype == np.float32
 
 def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, 
                      penalty_alpha=0., logdir=None):
+
+    if not validate_dtype(array):
+        raise TypeError('Xs must be numpy float32 type')
 
     with tf.Graph().as_default():
 
@@ -64,7 +84,7 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate,
             
             def add_layer_and_pens(inp, layer_def):
                 model, existing_penalties = inp
-                model, new_penalties = create_layer(model, *layer_def)                    
+                model, new_penalties = create_fc_layer(model, *layer_def)                    
                 penalties = existing_penalties + new_penalties
                 return model, penalties
 
