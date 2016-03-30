@@ -8,6 +8,13 @@ from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
 
 
+def flatten_panel(pn):
+    df = pn.to_frame().T
+    df.columns = range(df.shape[1])
+    return df
+
+flatten_df = lambda x: x.values.flatten()
+
 def get_date_index(ob):
     try:
         return ob.index

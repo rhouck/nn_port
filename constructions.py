@@ -2,23 +2,6 @@ import pandas as pd
 import numpy as np
 from toolz.curried import pipe, map
 
-
-def gen_random_normal(date_index, width):
-    length = date_index.shape[0]
-    return pd.DataFrame(np.random.randn(length, width), index=date_index) 
-
-def gen_random_probs(date_index, width):
-    length = date_index.shape[0]
-    df = pd.DataFrame(np.random.rand(length, width), index=date_index) 
-    return df.div(df.sum(axis=1), axis=0)
-
-def gen_random_onehot(date_index, width):
-    df = gen_random_probs(date_index, width)
-    df_maxs = df.apply(lambda x: list(x).index(max(x)), axis=1)
-    return pd.get_dummies(df_maxs)
-
-flatten_df = lambda x: x.values.flatten()
-
 def map_to_date(returns, start_date, func):
     """iteratively apply function to dataframe accross expanding window
     return dataframe of func results by date 
@@ -94,16 +77,3 @@ def get_multi_freq_historical_returns(returns, per):
     df = pd.concat([daily, weekly, monthly, quarterly])
     ind_name = df.index.name
     return df.reset_index().drop(ind_name, 1)
-
-
-def build_Xs_from_returns(returns, per):
-    """builds df containing returns data for all input ids in each row
-    output 
-    """
-        
-    p = pipe(returns.index,
-             map(lambda x: (x, returns[:x])),                          # filter lagged returns by date      
-             map(lambda x: (x[0], get_flat_returns_vecs(x[1], per))),  # create input rows
-             filter(lambda x: np.isnan(x[1]).any()==False),            # drop vectors with nan
-             map(lambda x: {x[0]: pd.Series(x[1], name=x[0])}))        # convert to Series
-    return pd.DataFrame(merge(p)).T

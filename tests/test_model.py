@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 import model_inputs as mi
-from constructions import *
+from gen_data import *
 import model as md
 
 
@@ -13,10 +13,10 @@ class TestModel(unittest.TestCase):
     
     def setUp(self):
         np.random.seed(0)
-        dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
-        self.Xs = gen_random_normal(dti, 20)
-        self.ys_probs = gen_random_probs(dti, 10)
-        self.ys_labels = gen_random_onehot(dti, 10)
+        self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
+        self.Xs = gen_random_normal(self.dti, 20)
+        self.ys_probs = gen_random_probs(self.dti, 10)
+        self.ys_labels = gen_random_onehot(self.dti, 10)
     
     def test_input_output_are_same_shape(self):
         inp = self.ys_labels.values
@@ -72,6 +72,8 @@ class TestModel(unittest.TestCase):
             _, _, stats = md.train_nn_softmax(ys.values, ys.values, [2], 1000, 500, .1, penalty_alpha=penalty_alpha)
             res.append(1. - stats['accuracy'])
         self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
-        
+
+    def test_conv_layer_outperforms_when_inputs_have_shared_structure(self):
+        pass
 
 

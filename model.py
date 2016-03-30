@@ -72,7 +72,6 @@ def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate,
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
-
             # set up objective
             loss = calc_loss(logits, y_) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
