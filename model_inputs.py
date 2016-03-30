@@ -59,7 +59,9 @@ def validate_and_format_Xs_ys(Xs, ys):
             raise ValueError("model inputs cannot contain nans")
     inds = [get_date_index(i) for i in inps]
     ind = pd.DatetimeIndex(sorted(set(inds[0]) & set(inds[1])))
-    return get_by_date(ind, Xs), get_by_date(ind, ys)
+    Xs = get_by_date(ind, Xs).astype(np.float32)
+    ys = get_by_date(ind, ys)
+    return Xs, ys
 
 def split_inputs_by_date(Xs, ys, split_date, buffer_days=0):
     """splits Xs and ys by 'split_date' + 'buffer_days'"""
@@ -69,4 +71,3 @@ def split_inputs_by_date(Xs, ys, split_date, buffer_days=0):
     Xs_b = Xs[split_date_shifted:]
     ys_b = ys[split_date_shifted:]
     return ((Xs_a, ys_a), (Xs_b, ys_b))
-
