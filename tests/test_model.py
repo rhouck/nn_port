@@ -8,6 +8,10 @@ import model_inputs as mi
 from gen_data import *
 import model as md
 
+class TestModelInputs(unittest.TestCase):
+
+    def test_validation_doesnt_remove_or_distord_data_unnecessarilly(self):
+        self.assertTrue(False)
 
 class TestModel(unittest.TestCase):
     
@@ -74,9 +78,20 @@ class TestModel(unittest.TestCase):
     #         res.append(1. - stats['accuracy'])
     #     self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
 
+    def test_fc_model_trains_w_mult_structue_input_types(self):
+        inp = self.ys_labels
+        Xs, ys = mi.validate_and_format_Xs_ys(inp, inp)
+        for structure in ([[],[]], [], [2]):
+            try:
+                _, _, _ = md.train_nn_softmax(Xs.values, ys.values, structure, 100, 100, .1)
+            except:
+                raise Exception('train model didnt like input: {0}'.format(structure))
+
     def test_conv_layer_outperforms_when_inputs_have_shared_structure(self):
         ys = self.ys_labels_conv
         Xs = mi.flatten_panel(self.Xs_conv)
         _, _, stats = md.train_nn_softmax(Xs.values, ys.values, [2], 1000, 100, .1)
         print stats
+
+
 

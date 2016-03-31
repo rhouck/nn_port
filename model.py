@@ -55,31 +55,44 @@ def create_conv_layer(input, name, out_size):
         initial = tf.constant(0.1, shape=[out_size])
         biases = tf.Variable(initial, name='biases')
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
-        return tf.nn.relu(conv2d + b_conv1)
+        return tf.nn.relu(conv2d + biases)
 
-def flatten_conv_layer():
-    pass
-    #h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+def flatten_conv_layer(layer, layer_width):
+    layer_depth = layer._shape[3]._value
+    return tf.reshape(layer, [-1, layer_depth*layer_width])
 
 def validate_dtype(array):
     return array.dtype == np.float32
 
-def train_nn_softmax(Xs, ys, shape, iterations, batch_size, learning_rate, 
+def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
                      penalty_alpha=0., logdir=None):
 
-    if not validate_dtype(array):
+    if not validate_dtype(Xs):
         raise TypeError('Xs must be numpy float32 type')
 
     with tf.Graph().as_default():
 
         with tf.Session() as sess:           
 
-            x = tf.placeholder(tf.float32, [None, Xs.shape[1]])
+            Xs_shape = [None] + list(Xs.shape[1:])
+            x = tf.placeholder(tf.float32, Xs_shape)
             y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
+            
+            
+            if structure and  all(isinstance(i, list) for i in structure):
+                conv_struct = structure[0]
+                hid_struct = structure[1]
+            else:
+                conv_struct = None
+                hid_struct = structure
+
+            print Xs.shape
+            print x
+
 
             # define model
-            prep_hidden = lambda x: ('hidden_{0}'.format(shape.index(x) + 1), x, tf.sigmoid, penalty_alpha)
-            layer_defs = list(map(prep_hidden, shape))
+            prep_hidden = lambda x: ('hidden_{0}'.format(hid_struct.index(x) + 1), x, tf.sigmoid, penalty_alpha)
+            layer_defs = list(map(prep_hidden, hid_struct))
             layer_defs.append(('softmax_linear', ys.shape[1], None, 0.))
             
             def add_layer_and_pens(inp, layer_def):
