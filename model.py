@@ -78,17 +78,12 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             x = tf.placeholder(tf.float32, Xs_shape)
             y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
             
-            
             if structure and  all(isinstance(i, list) for i in structure):
                 conv_struct = structure[0]
                 hid_struct = structure[1]
             else:
                 conv_struct = None
                 hid_struct = structure
-
-            print Xs.shape
-            print x
-
 
             # define model
             prep_hidden = lambda x: ('hidden_{0}'.format(hid_struct.index(x) + 1), x, tf.sigmoid, penalty_alpha)
