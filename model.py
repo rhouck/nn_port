@@ -47,19 +47,24 @@ def create_fc_layer(input, name, out_size, activation, alpha):
         
         return response, penalties
 
-def create_conv_layer(input, name, out_size):
+def create_conv_layer(input, name, out_depth):
     with tf.name_scope(name):
         width = input._shape[2]._value
-        initial = tf.truncated_normal([1, width, 1, out_size], stddev=0.1)
+        inp_depth = input._shape[3]._value
+        initial = tf.truncated_normal([1, width, inp_depth, out_depth], stddev=0.1)
         weights = tf.Variable(initial, name='weights')
-        initial = tf.constant(0.1, shape=[out_size])
+        initial = tf.constant(0.1, shape=[out_depth])
         biases = tf.Variable(initial, name='biases')
+        _ = tf.histogram_summary('weights', weights)
+        _ = tf.histogram_summary('biases', biases)
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         return tf.nn.relu(conv2d + biases)
 
-def flatten_conv_layer(layer, layer_width):
-    layer_depth = layer._shape[3]._value
-    return tf.reshape(layer, [-1, layer_depth*layer_width])
+def flatten_conv_layer(layer):
+    depth = layer._shape[3]._value
+    width = layer._shape[2]._value
+    height = layer._shape[1]._value
+    return tf.reshape(layer, [-1, depth*width*height])
 
 def validate_dtype(array):
     return array.dtype == np.float32
@@ -74,10 +79,6 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
 
         with tf.Session() as sess:           
 
-            Xs_shape = [None] + list(Xs.shape[1:])
-            x = tf.placeholder(tf.float32, Xs_shape)
-            y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
-            
             if structure and  all(isinstance(i, list) for i in structure):
                 conv_struct = structure[0]
                 fc_struct = structure[1]
@@ -86,13 +87,19 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 fc_struct = structure
 
             # define model
-            # if conv_struct:
-            #     print "build conv"
-            #     #lay = create_conv_layer(i, 'name', 2)
+            y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
+            Xs_shape = [None] + list(Xs.shape[1:])
+            x = tf.placeholder(tf.float32, Xs_shape)
+            
+            if conv_struct:
+                conv_name = lambda x: 'conv_layer_{0}'.format(conv_struct.index(x) + 1)
+                layer_defs = map(lambda x: (conv_name(x), x), conv_struct)          
+                x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
+                layer = reduce(lambda inp, ld: create_conv_layer(inp, ld[0], ld[1]), layer_defs, x_4d)
+                init_fc_layer = flatten_conv_layer(layer)
+            else:
+                init_fc_layer = x
 
-
-
-            #return 1, 2, 3
             fc_name = lambda x: 'fully_connected_{0}'.format(fc_struct.index(x) + 1)
             prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha)
             layer_defs = list(map(prep_fc_layers, fc_struct))
@@ -104,7 +111,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 penalties = existing_penalties + new_penalties
                 return model, penalties
 
-            logits, penalties = reduce(lambda inp, ld: add_layer_and_pens(inp, ld), layer_defs, (x, []))
+            logits, penalties = reduce(lambda inp, ld: add_layer_and_pens(inp, ld), layer_defs, (init_fc_layer, []))
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
