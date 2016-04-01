@@ -80,14 +80,22 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             
             if structure and  all(isinstance(i, list) for i in structure):
                 conv_struct = structure[0]
-                hid_struct = structure[1]
+                fc_struct = structure[1]
             else:
                 conv_struct = None
-                hid_struct = structure
+                fc_struct = structure
 
             # define model
-            prep_hidden = lambda x: ('hidden_{0}'.format(hid_struct.index(x) + 1), x, tf.sigmoid, penalty_alpha)
-            layer_defs = list(map(prep_hidden, hid_struct))
+            # if conv_struct:
+            #     print "build conv"
+            #     #lay = create_conv_layer(i, 'name', 2)
+
+
+
+            #return 1, 2, 3
+            fc_name = lambda x: 'fully_connected_{0}'.format(fc_struct.index(x) + 1)
+            prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha)
+            layer_defs = list(map(prep_fc_layers, fc_struct))
             layer_defs.append(('softmax_linear', ys.shape[1], None, 0.))
             
             def add_layer_and_pens(inp, layer_def):
