@@ -21,15 +21,29 @@ class TestDataGeneration(unittest.TestCase):
         np.random.seed(0)
         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
 
+    def check_kernel_predictive_accuracy(self, Xs, ys, true_weights):
+        """apply kernel to Xs and return correct prediction accuracy"""
+        weights_df = pd.DataFrame(np.array([true_weights,]*Xs.shape[1]), index=Xs.major_axis, columns=Xs.minor_axis)
+        scaled = Xs.multiply(weights_df)
+        
+        def get_max_ind(df):
+            x = list(df.sum(axis=1).values)
+            return x.index(max(x))
+
+        df = pd.DataFrame({'xs': pd.Series([get_max_ind(scaled[item]) for item in scaled.items], index=ys.index),
+                           'ys': ys.apply(lambda x: list(x).index(max(x)), axis=1)})
+        matches = df.apply(lambda x: x[0]==x[1], axis=1)
+        return float(matches.sum()) / matches.shape[0]
+
     def test_kernel_has_perfect_pred_power_with_no_noise(self):
         Xs, ys, tw = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, 15, 10, 0.)
-        self.assertEquals(check_kernel_predictive_accuracy(Xs, ys, tw), 1.)
+        self.assertEquals(self.check_kernel_predictive_accuracy(Xs, ys, tw), 1.)
 
     def test_adding_noise_reduces_kernel_predicted_power(self):    
         accs = []
         for i in (100., 10., 1., 0.):
             Xs, ys, tw = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, 15, 10, i)
-            accs.append(check_kernel_predictive_accuracy(Xs, ys, tw))
+            accs.append(self.check_kernel_predictive_accuracy(Xs, ys, tw))
         self.assertEquals(sorted(accs), accs)
 
 class TestModel(unittest.TestCase):
