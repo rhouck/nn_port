@@ -91,9 +91,9 @@ class TestModel(unittest.TestCase):
         self.assertTrue(probs.stack().corr(ys.stack()) > .95) 
 
     def test_noise_input_leads_to_stable_label_pred_based_on_max_val_freqs(self):
-        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',]).values
+        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
         Xs = gen_random_normal(ys.index, 20).values.astype(np.float32)
-        probs, _, _ = md.train_nn_softmax(Xs, ys, [], 1000, 100, .1)
+        probs, _, _ = md.train_nn_softmax(Xs, ys.values, [], 1000, 100, .1)
         probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
         prob_ranks = probs.rank(axis=1).mean(axis=0).sort_values(ascending=False).index
         cols = list(ys.columns)
@@ -108,7 +108,7 @@ class TestModel(unittest.TestCase):
     def test_regularization_decreases_ability_to_fit_train_set(self):
         ys = self.ys_labels.values.astype(np.float32)
         res = []
-        for penalty_alpha in (0., .1, .5):
+        for penalty_alpha in (0., .5, 2.):
             _, _, stats = md.train_nn_softmax(ys, ys, [2], 1000, 500, .1, penalty_alpha=penalty_alpha)
             res.append(1. - stats['accuracy'])
         self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
