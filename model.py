@@ -51,10 +51,13 @@ def create_conv_layer(input, name, out_depth):
     with tf.name_scope(name):
         width = input._shape[2]._value
         inp_depth = input._shape[3]._value
-        initial = tf.truncated_normal([1, width, inp_depth, out_depth], stddev=0.1)
-        weights = tf.Variable(initial, name='weights')
-        initial = tf.constant(0.1, shape=[out_depth])
-        biases = tf.Variable(initial, name='biases')
+        stddev = 1.0 / math.sqrt(float(inp_depth))
+        initial_weights = tf.random_normal([1, width, inp_depth, out_depth], stddev=stddev)
+        #initial = tf.truncated_normal([1, width, inp_depth, out_depth], stddev=0.1)
+        weights = tf.Variable(initial_weights, name='weights')
+        biases = tf.Variable(tf.zeros([out_depth]), name='biases')
+        #initial = tf.constant(0.1, shape=[out_depth])
+        #biases = tf.Variable(initial, name='biases')
         _ = tf.histogram_summary('weights', weights)
         _ = tf.histogram_summary('biases', biases)
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
