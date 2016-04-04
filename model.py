@@ -144,13 +144,15 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             init = tf.initialize_all_variables()
             sess.run(init)
             train_feed_dict={x: Xs_train, y_: ys_train}
+            test_feed_dict={x: Xs_test, y_: ys_test}
             for i in xrange(iterations):
                 bXs, bys = get_batch(Xs_train, ys_train, batch_size)
-                _, loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
+                _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
                 if i % 100 == 0:
+                    test_loss_value = sess.run(loss, feed_dict=test_feed_dict)
                     duration = time.time() - start_time
-                    msg = 'step {0:>5}:\tloss: {1:.2f}\t({2:.2f} sec)'
-                    print(msg.format(i, loss_value, duration))
+                    msg = 'step {0:>5}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'
+                    print(msg.format(i, train_loss_value, test_loss_value, duration))
                     if logdir:
                         summary_str = sess.run(summary_op, feed_dict=train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
