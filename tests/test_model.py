@@ -59,15 +59,15 @@ class TestModel(unittest.TestCase):
         self.Xs_conv, self.ys_labels_conv = mi.validate_and_format_Xs_ys(Xs_conv, ys_labels_conv)
 
     def test_input_output_are_same_shape(self):
-        inp = self.ys_labels.values.astype(np.float32)
-        probs, labels, _ = md.train_nn_softmax(inp, inp, [], 50, 10, .1)
+        inp = self.ys_labels.astype(np.float32).values
+        probs, labels, _ = md.train_nn_softmax([inp], [inp], [], 50, 10, .1)
         self.assertEquals(probs.shape, inp.shape)
         self.assertEquals(labels.shape[0], inp.shape[0])
 
     def test_random_inputs_creates_equal_weights(self):
         Xs = self.Xs.values
         for ys in (self.ys_probs.values, self.ys_labels.values):
-            probs, _, _ = md.train_nn_softmax(Xs, ys, [], 1000, 100, .1)
+            probs, _, _ = md.train_nn_softmax([Xs], [ys], [], 1000, 100, .1)
             probs = pd.DataFrame(probs)
             equal_weight = 1. / probs.shape[1]
             dist_from_equal = (probs.mean() - equal_weight).abs()
@@ -75,25 +75,26 @@ class TestModel(unittest.TestCase):
             self.assertTrue(short_dist.all())
 
     def test_single_softmax_learns_onehot_w_perfect_foresight(self):
-        inp = self.ys_labels.values.astype(np.float32)
-        _, _, stats = md.train_nn_softmax(inp, inp, [], 500, 100, .1)
+        inp = self.ys_labels.astype(np.float32).values
+        _, _, stats = md.train_nn_softmax([inp], [inp], [], 500, 100, .1)
         self.assertTrue(stats['accuracy'] > .99)
 
     def test_hidden_layers_softmax_learns_onehot_w_perfect_foresight(self):
-        inp = self.ys_labels.values.astype(np.float32)
-        _, _, stats  = md.train_nn_softmax(inp, inp, [10,], 1000, 100, .1)
+        inp = self.ys_labels.astype(np.float32).values
+        _, _, stats  = md.train_nn_softmax([inp], [inp], [10,], 1000, 100, .1)
         self.assertTrue(stats['accuracy'] > .99)
 
     def test_single_softmax_learns_opt_weights_w_perfect_foresight(self):
         ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
-        probs, _, _ = md.train_nn_softmax(ys.values.astype(np.float32), ys.values, [], 2000, 1000, .4)
+        inp = ys.astype(np.float32).values
+        probs, _, _ = md.train_nn_softmax([inp], [inp], [], 2000, 1000, .4)
         probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
         self.assertTrue(probs.stack().corr(ys.stack()) > .95) 
 
     def test_noise_input_leads_to_stable_label_pred_based_on_max_val_freqs(self):
         ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
-        Xs = gen_random_normal(ys.index, 20).values.astype(np.float32)
-        probs, _, _ = md.train_nn_softmax(Xs, ys.values, [], 1000, 100, .1)
+        Xs = gen_random_normal(ys.index, 20).astype(np.float32)     
+        probs, _, _ = md.train_nn_softmax([Xs.values], [ys.values], [], 1000, 100, .1)
         probs = pd.DataFrame(probs, columns=ys.columns, index=ys.index)
         prob_ranks = probs.rank(axis=1).mean(axis=0).sort_values(ascending=False).index
         cols = list(ys.columns)
@@ -106,10 +107,10 @@ class TestModel(unittest.TestCase):
         self.assertTrue(rank_corr > .5)
         
     def test_regularization_decreases_ability_to_fit_train_set(self):
-        ys = self.ys_labels.values.astype(np.float32)
+        inp = self.ys_labels.astype(np.float32).values
         res = []
         for penalty_alpha in (0., .5, 2.):
-            _, _, stats = md.train_nn_softmax(ys, ys, [2], 1000, 500, .1, penalty_alpha=penalty_alpha)
+            _, _, stats = md.train_nn_softmax([inp], [inp], [2], 1000, 500, .1, penalty_alpha=penalty_alpha)
             res.append(1. - stats['accuracy'])
         self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
 
@@ -118,7 +119,7 @@ class TestModel(unittest.TestCase):
         Xs, ys = mi.validate_and_format_Xs_ys(inp, inp)
         for structure in ([[],[]], [], [2]):
             try:
-                _, _, _ = md.train_nn_softmax(Xs.values, ys.values, structure, 100, 100, .1)
+                _, _, _ = md.train_nn_softmax([Xs.values], [ys.values], structure, 100, 100, .1)
             except:
                 raise Exception('train model didnt like input: {0}'.format(structure))
 

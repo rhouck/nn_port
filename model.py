@@ -74,9 +74,17 @@ def validate_dtype(array):
 
 def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
                      penalty_alpha=0., logdir=None):
-
-    if not validate_dtype(Xs):
-        raise TypeError('Xs must be numpy float32 type')
+    """train model on train set, test on train test set
+    Xs and ys: lists contaiing train set and optionally a test set
+    structure: list contianing convlayers depth and hidden layers depth
+    """
+    Xs_train = Xs[0]
+    Xs_test = Xs[1] if len(Xs) > 1 else np.array([])
+    ys_train = ys[0]
+    ys_test = ys[1] if len(ys) > 1 else np.array([])
+    for i in (Xs_train, Xs_test):
+        if i.any() and not validate_dtype(i):
+            raise TypeError('Xs must be numpy float32 type')
 
     with tf.Graph().as_default():
 
@@ -90,8 +98,8 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 fc_struct = structure
 
             # define model
-            y_ = tf.placeholder(tf.float32, [None, ys.shape[1]])
-            Xs_shape = [None] + list(Xs.shape[1:])
+            y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]])
+            Xs_shape = [None] + list(Xs_train.shape[1:])
             x = tf.placeholder(tf.float32, Xs_shape)
             
             if conv_struct:
@@ -106,7 +114,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             fc_name = lambda x: 'fully_connected_{0}'.format(fc_struct.index(x) + 1)
             prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha)
             layer_defs = list(map(prep_fc_layers, fc_struct))
-            layer_defs.append(('softmax_linear', ys.shape[1], None, 0.))
+            layer_defs.append(('softmax_linear', ys_train.shape[1], None, 0.))
             
             def add_layer_and_pens(inp, layer_def):
                 model, existing_penalties = inp
@@ -135,25 +143,25 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             start_time = time.time()
             init = tf.initialize_all_variables()
             sess.run(init)
-            feed_dict={x: Xs, y_: ys}
+            train_feed_dict={x: Xs_train, y_: ys_train}
             for i in xrange(iterations):
-                bXs, bys = get_batch(Xs, ys, batch_size)
+                bXs, bys = get_batch(Xs_train, ys_train, batch_size)
                 _, loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
                 if i % 100 == 0:
                     duration = time.time() - start_time
                     msg = 'step {0:>5}:\tloss: {1:.2f}\t({2:.2f} sec)'
                     print(msg.format(i, loss_value, duration))
                     if logdir:
-                        summary_str = sess.run(summary_op, feed_dict=feed_dict)
+                        summary_str = sess.run(summary_op, feed_dict=train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
             
-            res = sess.run([accuracy, loss], feed_dict)
+            res = sess.run([accuracy, loss], train_feed_dict)
             stats = {'accuracy': res[0],'cross_entropy': res[1]}
             print('accuracy:\t{0}'.format(res[0]))
             print('cross entropy:\t{0}'.format(res[1])) 
 
             # return predictions on train set
             prediction = tf.argmax(y,1)
-            max_weight_label = sess.run(prediction, feed_dict)
-            weights = sess.run(y, feed_dict)
+            max_weight_label = sess.run(prediction, train_feed_dict)
+            weights = sess.run(y, train_feed_dict)
             return weights, max_weight_label, stats
