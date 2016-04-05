@@ -77,6 +77,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
+    returns: dict of model predictions, dict of stats
     """
     Xs_train = Xs[0]
     Xs_test = Xs[1] if len(Xs) > 1 else np.array([])
@@ -126,7 +127,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
-            # set up objective
+            # set up objective function and items to measure
             loss = calc_loss(logits, y_) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
             _ = tf.scalar_summary('cross_entropy', loss)
@@ -149,7 +150,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 bXs, bys = get_batch(Xs_train, ys_train, batch_size)
                 _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
                 if i % 100 == 0:
-                    test_loss_value = sess.run(loss, feed_dict=test_feed_dict)
+                    test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     duration = time.time() - start_time
                     msg = 'step {0:>5}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'
                     print(msg.format(i, train_loss_value, test_loss_value, duration))
@@ -157,13 +158,22 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                         summary_str = sess.run(summary_op, feed_dict=train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
             
-            res = sess.run([accuracy, loss], train_feed_dict)
-            stats = {'accuracy': res[0],'cross_entropy': res[1]}
-            print('accuracy:\t{0}'.format(res[0]))
-            print('cross entropy:\t{0}'.format(res[1])) 
-
-            # return predictions on train set
+            # calc model predictions and summary stats
+            predictions, stats = {}, {}
             prediction = tf.argmax(y,1)
-            max_weight_label = sess.run(prediction, train_feed_dict)
-            weights = sess.run(y, train_feed_dict)
-            return weights, max_weight_label, stats
+            for i in (('train', train_feed_dict), ('test', test_feed_dict)):
+                try: 
+                    preds_res = sess.run([prediction, y], i[1])
+                    stats_res = sess.run([accuracy, loss], i[1])
+                except:
+                    preds_res = np.nan, np.nan
+                    stats_res = np.nan, np.nan
+                predictions[i[0]] = {'max_weight_label': preds_res[0], 'weights': preds_res[1]} 
+                stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
+            
+            msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
+            print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
+            msg = 'train loss:\t{0:.2f}\ttest loss:\t{1:.2f}'
+            print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
+
+            return predictions, stats
