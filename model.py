@@ -168,7 +168,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 except:
                     preds_res = np.nan, np.nan
                     stats_res = np.nan, np.nan
-                predictions[i[0]] = {'max_weight_label': preds_res[0], 'weights': preds_res[1]} 
+                predictions[i[0]] = {'labels': preds_res[0], 'weights': preds_res[1]} 
                 stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
             
             msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
