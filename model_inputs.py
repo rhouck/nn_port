@@ -70,10 +70,13 @@ def validate_and_format_Xs_ys(Xs, ys):
 def split_inputs_by_date(Xs, ys, split_date, buffer_periods=0):
     """splits Xs and ys by 'split_date' - 'buffer_periods'"""    
     date_ind = get_date_index(Xs).to_series()
-    test_split_date = date_ind[split_date:][0]
-    test_split_ind = date_ind.tolist().index(test_split_date)
+    try:
+        test_split_date = date_ind[split_date:][0]
+        test_split_ind = date_ind.tolist().index(test_split_date)
+    except:
+        test_split_ind = date_ind.shape[0]
+        
     train_split_ind = test_split_ind - buffer_periods
-
     Xs_train = Xs.iloc[:train_split_ind]
     ys_train = ys.iloc[:train_split_ind]
     Xs_test = Xs.iloc[test_split_ind:]

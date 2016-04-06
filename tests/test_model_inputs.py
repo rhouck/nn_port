@@ -61,6 +61,14 @@ class TestModelInputs(unittest.TestCase):
         except Exception as err:
             raise Exception('split_inputs_by_date failed with panel input: {0}'.format(err))
 
+    def test_split_dates_accepts_future_dates_by_returning_all_data_to_train_set(self):
+        Xs_inp = self.Xs_pn
+        train, test = mi.split_inputs_by_date(Xs_inp, self.ys_labels, datetime.date(2050,1,1), buffer_periods=0)
+        inp_ind = mi.get_date_index(Xs_inp)
+        train_ind =  mi.get_date_index(train[0])
+        test_ind = mi.get_date_index(test[0])
+        self.assertEquals(len(train_ind), len(inp_ind))
+        self.assertEquals(len(test_ind), 0)
 
 class TestDataGeneration(unittest.TestCase):
     
