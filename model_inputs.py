@@ -57,17 +57,25 @@ def validate_and_format_Xs_ys(Xs, ys):
     for i in inps:
         if i.isnull().values.any():
             raise ValueError("model inputs cannot contain nans")
+        if not isinstance(i.index, pd.tseries.index.DatetimeIndex):
+            raise ValueError("model inputs must contain datetime index")
+
     inds = [get_date_index(i) for i in inps]
     ind = pd.DatetimeIndex(sorted(set(inds[0]) & set(inds[1])))
     Xs = get_by_date(ind, Xs).astype(np.float32)
     ys = get_by_date(ind, ys)
+    
     return Xs, ys
 
-def split_inputs_by_date(Xs, ys, split_date, buffer_days=0):
-    """splits Xs and ys by 'split_date' + 'buffer_days'"""
-    split_date_shifted = split_date + datetime.timedelta(days=buffer_days)
-    Xs_a = Xs[:split_date]
-    ys_a = ys[:split_date]
-    Xs_b = Xs[split_date_shifted:]
-    ys_b = ys[split_date_shifted:]
-    return ((Xs_a, ys_a), (Xs_b, ys_b))
+def split_inputs_by_date(Xs, ys, split_date, buffer_periods=0):
+    """splits Xs and ys by 'split_date' - 'buffer_periods'"""    
+    test_split_date = Xs.index.to_series()[split_date:][0]
+    test_split_ind = Xs.index.tolist().index(test_split_date)
+    train_split_ind = test_split_ind - buffer_periods
+    
+    Xs_train = Xs.iloc[:train_split_ind]
+    ys_train = ys.iloc[:train_split_ind]
+    Xs_test = Xs.iloc[test_split_ind:]
+    ys_test = ys.iloc[test_split_ind:]
+    
+    return ((Xs_train, ys_train), (Xs_test, ys_test))

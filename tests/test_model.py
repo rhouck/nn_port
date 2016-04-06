@@ -93,7 +93,7 @@ class TestFCModel(unittest.TestCase):
     def tests_results_dif_and_non_nan_for_train_and_stats(self):
         Xs = self.Xs.astype(np.float32)
         ys = self.ys_labels.astype(np.float32)
-        train, test = mi.split_inputs_by_date(Xs, ys, datetime.date(2003,1,1), buffer_days=0)
+        train, test = mi.split_inputs_by_date(Xs, ys, datetime.date(2003,1,1), buffer_periods=0)
         Xs_train, ys_train = train
         Xs_test, ys_test = test
         X_inps = [Xs_train.values, Xs_test.values]
@@ -131,7 +131,7 @@ class TestConvModel(unittest.TestCase):
     def test_conv_layer_outperforms_in_test_set_when_inputs_have_shared_structure(self):
         ys = self.ys_labels_conv
         Xs = self.Xs_conv
-        train, test = mi.split_inputs_by_date(Xs, ys, datetime.date(2003,1,1), buffer_days=0)
+        train, test = mi.split_inputs_by_date(Xs, ys, datetime.date(2003,1,1), buffer_periods=0)
         Xs_train, ys_train = train
         Xs_test, ys_test = test
         Xs_train_f = mi.flatten_panel(Xs_train).astype(np.float32).values
