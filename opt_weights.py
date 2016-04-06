@@ -35,7 +35,7 @@ def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
     num_rows = df.shape[0]
     p = pipe(xrange(num_rows),
              filter(lambda x: x + look_ahead_per < num_rows),
-             map(lambda x: {df.index[x]: opt_weights_func(df.iloc[x:x+look_ahead_per])}))
+             map(lambda x: {df.index[x]: opt_weights_func(df.iloc[x:x+look_ahead_per+1])}))
     return pd.DataFrame(merge(p)).T
 
 def calc_cum_rets(df, alpha, norm_type, look_ahead_per):

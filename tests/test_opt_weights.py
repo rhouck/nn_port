@@ -10,9 +10,14 @@ from gen_data import *
 class TestCalcOptWeights(unittest.TestCase):
 
     def setUp(self):
-        np.random.seed(0)
-        self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=100)
-        self.ret = pd.read_csv('tests/test_data/returns.csv', index_col=0, parse_dates=['Date',])
+        self.ret = (pd.read_csv('tests/test_data/returns.csv', index_col=0, parse_dates=['Date',])
+                    .applymap(lambda x: x - 1.))
+
+    def test_selects_opt_puts_all_weight_on_top_performer_in_single_period(self):
+        opt_weights = ow.calc_opt_weights(self.ret.ix[:1], alpha=0, norm_type=2)    
+        single_per_returns = list(self.ret.ix[:1].values[0])
+        max_return_ind = single_per_returns.index(max(single_per_returns))
+        self.assertTrue(1 - opt_weights[max_return_ind] < 1e-3)
 
     def test_opt_weights_are_positive_and_sum_to_one_in_every_period(self):
         weights = ow.calc_opt_weights(self.ret, alpha=.1, norm_type=2)
@@ -20,7 +25,7 @@ class TestCalcOptWeights(unittest.TestCase):
         self.assertTrue(all(weights.map(lambda x: x > 0)))
 
     def test_high_l2_regularization_leads_to_equal_weight(self):
-        weights = ow.calc_opt_weights(self.ret, alpha=100, norm_type=2)
+        weights = ow.calc_opt_weights(self.ret, alpha=1000, norm_type=2)
         self.assertTrue(all(weights.sub(weights.mean()).abs().map(lambda x: x < 1e-3)))
     
     def test_results_are_same_for_both_norm_types_when_alpha_is_zero(self):
@@ -35,22 +40,22 @@ class TestCalcOptWeights(unittest.TestCase):
             weights = ow.calc_opt_weights(ret_n, alpha=.1, norm_type=2)
 
 
-# class TestRollingFitOptWeights(unittest.TestCase):
+class TestRollingFitOptWeights(unittest.TestCase):
 
-#     def setUp(self):
-#         np.random.seed(0)
-#         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
-#         self.ys_labels = gen_random_onehot(self.dti, 10)
-#         self.Xs = gen_random_normal(self.dti, 20)
+    def setUp(self):
+        self.ret = (pd.read_csv('tests/test_data/returns.csv', index_col=0, parse_dates=['Date',])
+                    .applymap(lambda x: x - 1.))
+        self.owf = lambda x: ow.calc_opt_weights(x, alpha=.1, norm_type=2)
 
-#     """
-#     tests:
-#     for each date, never looks back in time
-#     first date in first iteration is same as frist date in input data frame
-#     look exits when fewer additional rows than look ahead input 
-#     (i.e. final date in return df is look_ahead_per less than len of input df)
-#     applied weights with minimum look ahead outperforms equal weights
-#     check that optimal weights beat equal weights
-#     """
-
-
+    def test_look_ahead_per_0_gives_opt_weights_for_each_date(self):
+        inp = self.ret.iloc[:15]
+        opt_weights = ow.rolling_fit_opt_weights(inp, self.owf, 0)
+        self.assertEqual(opt_weights.shape[0], inp.shape[0])
+    
+    def test_look_ahead_per_reduces_opt_weights_index_from_end(self):
+        look_ahead_per = 5
+        inp = self.ret.iloc[:15]
+        opt_weights = ow.rolling_fit_opt_weights(inp, self.owf, look_ahead_per)
+        self.assertEqual(opt_weights.shape[0] + look_ahead_per, inp.shape[0])
+        self.assertEqual(inp.index[0], opt_weights.index[0])
+        self.assertNotEqual(inp.index[-1], opt_weights.index[-1])
