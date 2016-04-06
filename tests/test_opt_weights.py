@@ -29,7 +29,7 @@ class TestCalcOptWeights(unittest.TestCase):
         self.assertTrue(weights_1.equals(weights_2))
 
     def test_raises_exception_if_contains_nan(self):
-        ret_n = self.ret.copy(deep=True)
+        ret_n = self.ret
         ret_n.iloc[50,:] = np.nan
         with self.assertRaises(ValueError):
             weights = ow.calc_opt_weights(ret_n, alpha=.1, norm_type=2)

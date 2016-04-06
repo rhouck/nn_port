@@ -13,8 +13,10 @@ class TestModelInputs(unittest.TestCase):
     def setUp(self):
         np.random.seed(0)
         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
+        self.split_date = datetime.date(2002,1,1)
         self.ys_labels = gen_random_onehot(self.dti, 10)
         self.Xs = gen_random_normal(self.dti, 20)
+        self.Xs_pn, _, _ = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, num_classes=10, num_features=10, noise_sigma=10.)
         
     def test_validation_doesnt_remove_or_distort_data_unnecessarilly(self):
         Xs = self.Xs.astype(np.float32)
@@ -32,13 +34,12 @@ class TestModelInputs(unittest.TestCase):
             _, _ = mi.validate_and_format_Xs_ys(Xs, self.ys_labels)
 
     def test_splits_dates_doesnt_create_train_test_overlap(self):
-        split_date = datetime.date(2002,1,1)
-        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, split_date, buffer_periods=0)
+        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, self.split_date, buffer_periods=0)
 
         def get_len_overlap(a, b):
             return len(set(a) & set(b))
 
-        self.assertEquals(test[0].index[0], pd.to_datetime(split_date))
+        self.assertEquals(test[0].index[0], pd.to_datetime(self.split_date))
         self.assertEquals(get_len_overlap(train[0].index, test[0].index), 0)
         self.assertEquals(get_len_overlap(train[0].index, train[1].index), train[0].index.shape[0])
         self.assertEquals(get_len_overlap(test[0].index, test[1].index), test[0].index.shape[0])
@@ -46,13 +47,20 @@ class TestModelInputs(unittest.TestCase):
         
     def test_split_dates_buffer_reduces_train_ts_from_end(self):
         buffer_periods = 5
-        split_date = datetime.date(2002,1,1)
-        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, split_date, buffer_periods=buffer_periods)
+        
+        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, self.split_date, buffer_periods=buffer_periods)
         self.assertEquals(train[0].index[0], self.Xs.index[0])
         ind = self.Xs.index.to_series()
-        self.assertEquals(test[0].index[0], ind.ix[split_date:][0])
-        self.assertNotEquals(train[0].index[-1], ind.ix[:split_date][-2])
+        self.assertEquals(test[0].index[0], ind.ix[self.split_date:][0])
+        self.assertNotEquals(train[0].index[-1], ind.ix[:self.split_date][-2])
         self.assertEquals(len(train[0].index) + len(test[0].index), len(self.Xs.index) - buffer_periods)
+
+    def test_split_dates_works_on_panels(self):
+        try:
+            mi.split_inputs_by_date(self.Xs_pn, self.ys_labels, self.split_date, buffer_periods=0)
+        except Exception as err:
+            raise Exception('split_inputs_by_date failed with panel input: {0}'.format(err))
+
 
 class TestDataGeneration(unittest.TestCase):
     

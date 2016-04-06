@@ -57,7 +57,7 @@ def validate_and_format_Xs_ys(Xs, ys):
     for i in inps:
         if i.isnull().values.any():
             raise ValueError("model inputs cannot contain nans")
-        if not isinstance(i.index, pd.tseries.index.DatetimeIndex):
+        if not isinstance(get_date_index(i), pd.tseries.index.DatetimeIndex):
             raise ValueError("model inputs must contain datetime index")
 
     inds = [get_date_index(i) for i in inps]
@@ -69,10 +69,11 @@ def validate_and_format_Xs_ys(Xs, ys):
 
 def split_inputs_by_date(Xs, ys, split_date, buffer_periods=0):
     """splits Xs and ys by 'split_date' - 'buffer_periods'"""    
-    test_split_date = Xs.index.to_series()[split_date:][0]
-    test_split_ind = Xs.index.tolist().index(test_split_date)
+    date_ind = get_date_index(Xs).to_series()
+    test_split_date = date_ind[split_date:][0]
+    test_split_ind = date_ind.tolist().index(test_split_date)
     train_split_ind = test_split_ind - buffer_periods
-    
+
     Xs_train = Xs.iloc[:train_split_ind]
     ys_train = ys.iloc[:train_split_ind]
     Xs_test = Xs.iloc[test_split_ind:]
