@@ -101,6 +101,9 @@ class TestFCModel(unittest.TestCase):
         _, stats = md.train_nn_softmax(X_inps, y_inps, [], 500, 500, .1)
         for i in ('accuracy', 'cross_entropy'):
             self.assertNotEqual(stats['train'][i], stats['test'][i])
+
+    def test_dropout_has_no_effect_when_keep_prob_is_one(self):
+        self.assertTrue(False)
     
     
 class TestConvModel(unittest.TestCase):
