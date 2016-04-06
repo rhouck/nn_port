@@ -28,18 +28,22 @@ def tracked_train_step(loss, learning_rate):
     train_step = optimizer.minimize(loss, global_step=global_step)
     return train_step
 
-def create_fc_layer(input, name, out_size, activation, alpha):
+def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         stddev = 1.0 / math.sqrt(float(in_size))
         weights = tf.Variable(tf.random_normal(weights_dim, stddev=stddev, name='weights'))
         biases = tf.Variable(tf.zeros([out_size]), name='biases')
+        #_ = tf.histogram_summary('weights', weights)
+        #_ = tf.histogram_summary('biases', biases)
+
         logits = tf.matmul(input, weights) + biases
-        _ = tf.histogram_summary('weights', weights)
-        _ = tf.histogram_summary('biases', biases)
         response = activation(logits) if activation else logits
         
+        # if dropout_rate: 
+        #     response = tf.nn.dropout(response, dropout_rate)
+
         penalties = []
         if alpha:
             i = ((weights, 'weights'), (biases, 'biases'))
@@ -53,13 +57,11 @@ def create_conv_layer(input, name, out_depth):
         inp_depth = input._shape[3]._value
         stddev = 1.0 / math.sqrt(float(inp_depth))
         initial_weights = tf.random_normal([1, width, inp_depth, out_depth], stddev=stddev)
-        #initial = tf.truncated_normal([1, width, inp_depth, out_depth], stddev=0.1)
         weights = tf.Variable(initial_weights, name='weights')
         biases = tf.Variable(tf.zeros([out_depth]), name='biases')
-        #initial = tf.constant(0.1, shape=[out_depth])
-        #biases = tf.Variable(initial, name='biases')
         _ = tf.histogram_summary('weights', weights)
         _ = tf.histogram_summary('biases', biases)
+        
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         return tf.nn.relu(conv2d + biases)
 
@@ -73,7 +75,7 @@ def validate_dtype(array):
     return array.dtype == np.float32
 
 def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
-                     penalty_alpha=0., logdir=None):
+                     penalty_alpha=0., dropout_rate=0., logdir=None):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -99,10 +101,14 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 fc_struct = structure
 
             # define model
+            #
+
+            # setup placeholders
             y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]])
             Xs_shape = [None] + list(Xs_train.shape[1:])
             x = tf.placeholder(tf.float32, Xs_shape)
             
+            # define and create convolution layers if needed
             if conv_struct:
                 conv_name = lambda x: 'conv_layer_{0}'.format(conv_struct.index(x) + 1)
                 layer_defs = map(lambda x: (conv_name(x), x), conv_struct)          
@@ -112,21 +118,26 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             else:
                 init_fc_layer = x
 
+            # define fully connected hidden layers if needed
             fc_name = lambda x: 'fully_connected_{0}'.format(fc_struct.index(x) + 1)
-            prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha)
-            layer_defs = list(map(prep_fc_layers, fc_struct))
-            layer_defs.append(('softmax_linear', ys_train.shape[1], None, 0.))
+            prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha, dropout_rate)
+            fc_layer_defs = list(map(prep_fc_layers, fc_struct))
             
-            def add_layer_and_pens(inp, layer_def):
+            # define softmax layer
+            fc_layer_defs.append(('softmax_linear', ys_train.shape[1], None, 0., 0.))
+            
+            def add_fc_layer_and_penalties(inp, layer_def):
                 model, existing_penalties = inp
                 model, new_penalties = create_fc_layer(model, *layer_def)                    
                 penalties = existing_penalties + new_penalties
                 return model, penalties
 
-            logits, penalties = reduce(lambda inp, ld: add_layer_and_pens(inp, ld), layer_defs, (init_fc_layer, []))
+            # iteratively compbine model layers
+            logits, penalties = reduce(lambda inp, ld: add_fc_layer_and_penalties(inp, ld), fc_layer_defs, (init_fc_layer, []))
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
+
             # set up objective function and items to measure
             loss = calc_loss(logits, y_) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)

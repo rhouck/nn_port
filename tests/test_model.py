@@ -104,6 +104,9 @@ class TestFCModel(unittest.TestCase):
 
     def test_dropout_has_no_effect_when_keep_prob_is_one(self):
         self.assertTrue(False)
+
+    def test_dropout_is_only_applied_to_train_model_not_test(self):
+        self.assertTrue(False)        
     
     
 class TestConvModel(unittest.TestCase):
