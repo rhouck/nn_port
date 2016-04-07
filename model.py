@@ -30,20 +30,18 @@ def tracked_train_step(loss, learning_rate):
 
 def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
     with tf.name_scope(name):
-        print name
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         stddev = 1.0 / math.sqrt(float(in_size))
-        weights = tf.Variable(tf.random_normal(weights_dim, stddev=stddev, name='weights'))
+        weights = tf.Variable(tf.random_normal(weights_dim, stddev=stddev), name='weights')
         biases = tf.Variable(tf.zeros([out_size]), name='biases')
         #_ = tf.histogram_summary('weights', weights)
         #_ = tf.histogram_summary('biases', biases)
 
         logits = tf.matmul(input, weights) + biases
         response = activation(logits) if activation else logits
-        
-        # if dropout_rate: 
-        #     response = tf.nn.dropout(response, dropout_rate)
+        if dropout_rate: 
+            response = tf.nn.dropout(response, dropout_rate)
 
         penalties = []
         if alpha:
@@ -52,9 +50,17 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
         
         return response, penalties
 
+def add_fc_layer_and_penalties(inp, *layer_def_args):
+    """feeds model layers into subsequent model layers while 
+    collecting penalty objects to separately add to loss function"""
+    model, existing_penalties = inp             
+    create_fc_layer_inps = [model,] +  list(layer_def_args)
+    model, new_penalties = create_fc_layer(*create_fc_layer_inps)                    
+    penalties = existing_penalties + new_penalties
+    return model, penalties
+
 def create_conv_layer(input, name, out_depth):
     with tf.name_scope(name):
-        print name
         width = input._shape[2]._value
         inp_depth = input._shape[3]._value
         stddev = 1.0 / math.sqrt(float(inp_depth))
@@ -73,15 +79,6 @@ def define_layers(base_name, layer_structure, *args):
     ind_shape_pairs = zip(range(len(layer_structure)), layer_structure)
     return map(lambda x: [name_func(x[0]), x[1]] + list(args), ind_shape_pairs)          
 
-def add_fc_layer_and_penalties(inp, *layer_def_args):
-    """feeds model layers into subsequent model layers while 
-    collecting penalty objects to separately add to loss function"""
-    model, existing_penalties = inp             
-    create_fc_layer_inps = [model,] +  list(layer_def_args)
-    model, new_penalties = create_fc_layer(*create_fc_layer_inps)                    
-    penalties = existing_penalties + new_penalties
-    return model, penalties
-
 def flatten_conv_layer(layer):
     depth = layer._shape[3]._value
     width = layer._shape[2]._value
@@ -99,7 +96,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
     returns: dict of model predictions, dict of stats
     """
 
-    # input validation
+    # input validation and formatting
     Xs_train = Xs[0]
     Xs_test = Xs[1] if len(Xs) > 1 else np.array([])
     ys_train = ys[0]
@@ -107,15 +104,15 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
     for i in (Xs_train, Xs_test):
         if i.any() and not validate_dtype(i):
             raise TypeError('Xs must be numpy float32 type')
-
-    # split structure layouts
+    
     if structure and  all(isinstance(i, list) for i in structure):
         conv_struct = structure[0]
         fc_struct = structure[1]
     else:
         conv_struct = None
         fc_struct = structure
-                
+
+    
     with tf.Graph().as_default():
 
         with tf.Session() as sess:           
@@ -153,6 +150,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             _ = tf.scalar_summary('accuracy', accuracy)
             
+            # record training statistics
             if logdir:
                 summary_op = tf.merge_all_summaries()
                 summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
