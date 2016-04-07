@@ -106,8 +106,11 @@ class TestFCModel(unittest.TestCase):
         self.assertTrue(False)
 
     def test_dropout_is_only_applied_to_train_model_not_test(self):
-        self.assertTrue(False)        
-    
+        self.assertTrue(False)
+
+    def test_model_structure_matches_inputs(self):
+        self.assertTrue(False)
+        
     
 class TestConvModel(unittest.TestCase):
     

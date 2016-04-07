@@ -30,6 +30,7 @@ def tracked_train_step(loss, learning_rate):
 
 def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
     with tf.name_scope(name):
+        print name
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         stddev = 1.0 / math.sqrt(float(in_size))
@@ -53,17 +54,33 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
 
 def create_conv_layer(input, name, out_depth):
     with tf.name_scope(name):
+        print name
         width = input._shape[2]._value
         inp_depth = input._shape[3]._value
         stddev = 1.0 / math.sqrt(float(inp_depth))
         initial_weights = tf.random_normal([1, width, inp_depth, out_depth], stddev=stddev)
         weights = tf.Variable(initial_weights, name='weights')
         biases = tf.Variable(tf.zeros([out_depth]), name='biases')
-        _ = tf.histogram_summary('weights', weights)
-        _ = tf.histogram_summary('biases', biases)
+        #_ = tf.histogram_summary('weights', weights)
+        #_ = tf.histogram_summary('biases', biases)
         
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         return tf.nn.relu(conv2d + biases)
+
+def define_layers(base_name, layer_structure, *args):
+    """returns list of lists of inputs to feed 'add layer' functions""" 
+    name_func = lambda x: '{0}_{1}'.format(base_name, x + 1)
+    ind_shape_pairs = zip(range(len(layer_structure)), layer_structure)
+    return map(lambda x: [name_func(x[0]), x[1]] + list(args), ind_shape_pairs)          
+
+def add_fc_layer_and_penalties(inp, *layer_def_args):
+    """feeds model layers into subsequent model layers while 
+    collecting penalty objects to separately add to loss function"""
+    model, existing_penalties = inp             
+    create_fc_layer_inps = [model,] +  list(layer_def_args)
+    model, new_penalties = create_fc_layer(*create_fc_layer_inps)                    
+    penalties = existing_penalties + new_penalties
+    return model, penalties
 
 def flatten_conv_layer(layer):
     depth = layer._shape[3]._value
@@ -81,6 +98,8 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
     structure: list contianing convlayers depth and hidden layers depth
     returns: dict of model predictions, dict of stats
     """
+
+    # input validation
     Xs_train = Xs[0]
     Xs_test = Xs[1] if len(Xs) > 1 else np.array([])
     ys_train = ys[0]
@@ -89,55 +108,42 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
         if i.any() and not validate_dtype(i):
             raise TypeError('Xs must be numpy float32 type')
 
+    # split structure layouts
+    if structure and  all(isinstance(i, list) for i in structure):
+        conv_struct = structure[0]
+        fc_struct = structure[1]
+    else:
+        conv_struct = None
+        fc_struct = structure
+                
     with tf.Graph().as_default():
 
         with tf.Session() as sess:           
-
-            if structure and  all(isinstance(i, list) for i in structure):
-                conv_struct = structure[0]
-                fc_struct = structure[1]
-            else:
-                conv_struct = None
-                fc_struct = structure
-
-            # define model
-            #
 
             # setup placeholders
             y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]])
             Xs_shape = [None] + list(Xs_train.shape[1:])
             x = tf.placeholder(tf.float32, Xs_shape)
             
+            def combine_layers(create_layer_func, layer_defs, inputs):
+                return reduce(lambda inp, ld: create_layer_func(inp, *ld), layer_defs, inputs)
+
             # define and create convolution layers if needed
             if conv_struct:
-                conv_name = lambda x: 'conv_layer_{0}'.format(conv_struct.index(x) + 1)
-                layer_defs = map(lambda x: (conv_name(x), x), conv_struct)          
+                conv_layer_defs = define_layers('conv_layer', conv_struct)
                 x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
-                layer = reduce(lambda inp, ld: create_conv_layer(inp, ld[0], ld[1]), layer_defs, x_4d)
-                init_fc_layer = flatten_conv_layer(layer)
+                final_conv_layer = combine_layers(create_conv_layer, conv_layer_defs, x_4d)
+                init_fc_layer = flatten_conv_layer(final_conv_layer)
             else:
                 init_fc_layer = x
-
-            # define fully connected hidden layers if needed
-            fc_name = lambda x: 'fully_connected_{0}'.format(fc_struct.index(x) + 1)
-            prep_fc_layers = lambda x: (fc_name(x), x, tf.sigmoid, penalty_alpha, dropout_rate)
-            fc_layer_defs = list(map(prep_fc_layers, fc_struct))
             
-            # define softmax layer
-            fc_layer_defs.append(('softmax_linear', ys_train.shape[1], None, 0., 0.))
-            
-            def add_fc_layer_and_penalties(inp, layer_def):
-                model, existing_penalties = inp
-                model, new_penalties = create_fc_layer(model, *layer_def)                    
-                penalties = existing_penalties + new_penalties
-                return model, penalties
-
-            # iteratively compbine model layers
-            logits, penalties = reduce(lambda inp, ld: add_fc_layer_and_penalties(inp, ld), fc_layer_defs, (init_fc_layer, []))
+            # define fully connected hidden layers and final softmax layer
+            fc_layer_defs = define_layers('fully_connected', fc_struct, tf.sigmoid, penalty_alpha, dropout_rate)
+            fc_layer_defs.append(['softmax_linear', ys_train.shape[1], None, 0., 0.])
+            logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
-
             # set up objective function and items to measure
             loss = calc_loss(logits, y_) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
