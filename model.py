@@ -41,7 +41,8 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
         logits = tf.matmul(input, weights) + biases
         response = activation(logits) if activation else logits
         if dropout_rate: 
-            response = tf.nn.dropout(response, dropout_rate)
+            print "applying dropout"
+            response = tf.nn.dropout(response, 1. - dropout_rate)
 
         penalties = []
         if alpha:
@@ -136,7 +137,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             
             # define fully connected hidden layers and final softmax layer
             fc_layer_defs = define_layers('fully_connected', fc_struct, tf.sigmoid, penalty_alpha, dropout_rate)
-            fc_layer_defs.append(['softmax_linear', ys_train.shape[1], None, 0., 0.])
+            fc_layer_defs.append(['softmax_linear', ys_train.shape[1], None, penalty_alpha, dropout_rate])
             logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
             y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
