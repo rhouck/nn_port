@@ -1,5 +1,5 @@
 import pandas as pd
-from cvxpy import *
+import cvxpy as cv
 import numpy as np
 from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
@@ -17,15 +17,19 @@ def calc_opt_weights(df, alpha=0, norm_type=2):
     """
     if df.isnull().values.any():
         raise ValueError("dataframe cannot contain nans")
+    if df.shape[0] < 3:
+        raise ValueError("dataframe must contain at least 3 rows")
+    if abs(df.stack().mean() - 1) < .1:
+        raise ValueError("returns data must be centered at 0 not 1")
 
     X = df.values
     y = np.ones(df.shape[0])
 
-    w = Variable(df.shape[1])
-    reg = norm(w, 2)
-    objective = Minimize(sum_squares(X*w - y) + alpha*reg)
+    w = cv.Variable(df.shape[1])
+    reg = cv.norm(w, norm_type)
+    objective = cv.Minimize(cv.sum_squares(X*w - y) + alpha*reg)
     constraints = [0 <= w, sum(w) == 1]
-    prob = Problem(objective, constraints)
+    prob = cv.Problem(objective, constraints)
 
     result = prob.solve()
     return pd.Series(np.asarray(w.value).flatten(), index=df.columns)
