@@ -102,8 +102,13 @@ class TestFCModel(unittest.TestCase):
         for i in ('accuracy', 'cross_entropy'):
             self.assertNotEqual(stats['train'][i], stats['test'][i])
 
-    def test_dropout_has_no_effect_when_keep_prob_is_one(self):
-        self.assertTrue(False)
+    def test_dropout_rate_decreases_ability_to_fit_train_set(self):
+        inp = self.ys_labels.astype(np.float32).values
+        res = []
+        for dropout_rate in (0., .5, .99):
+            _, stats = md.train_nn_softmax([inp], [inp], [], 1000, 100, .5, dropout_rate=dropout_rate)
+            res.append(1. - stats['train']['accuracy'])
+        self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
 
     def test_dropout_is_only_applied_to_train_model_not_test(self):
         self.assertTrue(False)
