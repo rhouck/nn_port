@@ -5,6 +5,8 @@ from toolz.curried import pipe, map, filter
 from toolz.dicttoolz import merge
 from itertools import product
 
+import utils as ut
+
 
 def calc_opt_weights(df, alpha=0, norm_type=2):    
     """returns optimal weights of returns df with optional regularization
@@ -42,21 +44,20 @@ def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
              map(lambda x: {df.index[x]: opt_weights_func(df.iloc[x:x+look_ahead_per+1])}))
     return pd.DataFrame(merge(p)).T
 
-def calc_cum_rets(df, alpha, norm_type, look_ahead_per):
-    """calculates cumulative returns for optimal portfolio 
+def calc_opt_weight_portfolio_ir(df, alpha, norm_type, look_ahead_per):
+    """calculates ir for optimal portfolio 
     determined by alpha, norm_type, look_ahead_per"""
     opt_weights_func = lambda x: calc_opt_weights(x, alpha=alpha, norm_type=norm_type)
     weights = rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per=look_ahead_per)
-    return (df * weights).sum(axis=1).cumprod()
+    return ut.get_ir((df * weights).sum(axis=1))
 
-def cum_prod_grid(df, alphas=np.exp(np.linspace(-10, 2, 10)), 
-                  look_ahead_pers=xrange(1,30,5)):
+def cum_prod_grid(df, alphas, look_ahead_pers):
     """exhaustive grid search over alphas, look_ahead_per, norm_types 
     returning dataframe of cumulative returns for each optimal portfolio construction"""
     norm_types = [1,2]
     end_date = df.index[-(look_ahead_pers[-1] + 1)]
     p = pipe(product(alphas, norm_types, look_ahead_pers),
-             map(lambda x: list(x) + [calc_cum_rets(df, x[0], x[1], x[2])]),
-             map(lambda x: x[:-1] + [x[-1][:end_date].tail(1).values[0]]),
-             map(lambda x: dict(zip(['alpha', 'norm_type', 'look_ahead_per', 'cum_ret'], x))))
+             map(lambda x: list(x) + [calc_opt_weight_portfolio_ir(df, x[0], x[1], x[2])]),
+             map(lambda x: dict(zip(['alpha', 'norm_type', 'look_ahead_per', 'ir'], x))))
     return pd.DataFrame(list(p))
+
