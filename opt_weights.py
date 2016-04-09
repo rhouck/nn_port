@@ -51,7 +51,7 @@ def calc_opt_weight_portfolio_ir(df, alpha, norm_type, look_ahead_per):
     weights = rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per=look_ahead_per)
     return ut.get_ir((df * weights).sum(axis=1))
 
-def ir_grid(df, alphas, look_ahead_pers):
+def opt_weight_ir_grid(df, alphas, look_ahead_pers):
     """exhaustive grid search over alphas, look_ahead_per, norm_types 
     returning dataframe of cumulative returns for each optimal portfolio construction"""
     norm_types = [1,2]
