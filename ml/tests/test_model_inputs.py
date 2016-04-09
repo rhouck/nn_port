@@ -4,7 +4,7 @@ import datetime
 import numpy as np
 import pandas as pd
 
-import model_inputs as mi
+import ml.model_inputs as mi
 from gen_data import *
 
 

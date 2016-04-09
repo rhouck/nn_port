@@ -1,17 +1,19 @@
+import os
 import unittest
 
 import numpy as np
 import pandas as pd
 
-import opt_weights as ow
-import utils as ut
+import ml.opt_weights as ow
+import ml.utils as ut
 from gen_data import *
 
 
 class TestCalcOptWeights(unittest.TestCase):
 
     def setUp(self):
-        self.ret = (pd.read_csv('tests/test_data/returns.csv', index_col=0, parse_dates=['Date',])
+        TEST_DATA_DIR = os.path.dirname(os.path.realpath(__file__)) + '/test_data/'
+        self.ret = (pd.read_csv(TEST_DATA_DIR + 'returns.csv', index_col=0, parse_dates=['Date',])
                     .applymap(lambda x: x - 1.))
 
     def test_opt_weights_are_positive_and_sum_to_one_in_every_period(self):
@@ -67,7 +69,8 @@ class TestCalcOptWeights(unittest.TestCase):
 class TestRollingFitOptWeights(unittest.TestCase):
 
     def setUp(self):
-        self.ret = (pd.read_csv('tests/test_data/returns.csv', index_col=0, parse_dates=['Date',])
+        TEST_DATA_DIR = os.path.dirname(os.path.realpath(__file__)) + '/test_data/'
+        self.ret = (pd.read_csv(TEST_DATA_DIR + 'returns.csv', index_col=0, parse_dates=['Date',])
                     .applymap(lambda x: x - 1.))
         self.owf = lambda x: ow.calc_opt_weights(x, alpha=.1, norm_type=2)
     

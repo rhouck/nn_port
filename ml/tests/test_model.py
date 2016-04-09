@@ -1,11 +1,12 @@
+import os
 import unittest
 import datetime
 
 import numpy as np
 import pandas as pd
 
-import model_inputs as mi
-import model as md
+import ml.model_inputs as mi
+import ml.model as md
 import tensorflow as tf
 from gen_data import *
 
@@ -13,6 +14,7 @@ from gen_data import *
 class TestFCModel(unittest.TestCase):
     
     def setUp(self):
+        self.TEST_DATA_DIR = os.path.dirname(os.path.realpath(__file__)) + '/test_data/'
         np.random.seed(0)
         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
         self.ys_probs = gen_random_probs(self.dti, 10)
@@ -50,7 +52,7 @@ class TestFCModel(unittest.TestCase):
         self.assertTrue(stats['train']['accuracy'] > .99)
 
     def test_single_softmax_learns_opt_weights_w_perfect_foresight(self):
-        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
+        ys = pd.read_csv(self.TEST_DATA_DIR + 'opt_weights_20.csv', index_col=0, parse_dates=['Date',])
         inp = ys.astype(np.float32).values
         preds, _ = md.train_nn_softmax([inp], [inp], [], 2000, 1000, .4)
         probs = preds['train']['weights']
@@ -58,7 +60,7 @@ class TestFCModel(unittest.TestCase):
         self.assertTrue(probs.stack().corr(ys.stack()) > .95) 
 
     def test_noise_input_leads_to_stable_label_pred_based_on_max_val_freqs(self):
-        ys = pd.read_csv('tests/test_data/opt_weights_20.csv', index_col=0, parse_dates=['Date',])
+        ys = pd.read_csv(self.TEST_DATA_DIR + 'opt_weights_20.csv', index_col=0, parse_dates=['Date',])
         Xs = gen_random_normal(ys.index, 20).astype(np.float32)     
         preds, _ = md.train_nn_softmax([Xs.values], [ys.values], [], 1000, 100, .1)
         probs = preds['train']['weights']
