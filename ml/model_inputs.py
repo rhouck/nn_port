@@ -59,7 +59,10 @@ def validate_and_format_Xs_ys(Xs, ys):
             raise ValueError("model inputs cannot contain nans")
         if not isinstance(get_date_index(i), pd.tseries.index.DatetimeIndex):
             raise ValueError("model inputs must contain datetime index")
-
+    if len(Xs.shape) == 3:
+        if Xs.shape[1] != ys.shape[1]:
+            raise ValueError("model inputs dimension mismatch (num classes must be equal)")
+    
     inds = [get_date_index(i) for i in inps]
     ind = pd.DatetimeIndex(sorted(set(inds[0]) & set(inds[1])))
     Xs = get_by_date(ind, Xs).astype(np.float32)

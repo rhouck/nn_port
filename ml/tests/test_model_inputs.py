@@ -70,6 +70,10 @@ class TestModelInputs(unittest.TestCase):
         self.assertEquals(len(train_ind), len(inp_ind))
         self.assertEquals(len(test_ind), 0)
 
+    def test_panel_Xs_and_ys_must_have_same_num_classes(self):
+        with self.assertRaises(ValueError):
+            mi.validate_and_format_Xs_ys(self.Xs_pn, self.ys_labels.iloc[:,:5])
+
 class TestDataGeneration(unittest.TestCase):
     
     def setUp(self):
