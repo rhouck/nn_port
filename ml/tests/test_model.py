@@ -123,11 +123,16 @@ class TestConvModel(unittest.TestCase):
     
     def setUp(self):
         np.random.seed(0)
+        self.num_classes = 15
+        self.num_features = 10
         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
-        Xs_conv, ys_labels_conv, self.true_weights = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, num_classes=15, num_features=10, noise_sigma=10.)
+        Xs_conv, ys_labels_conv, self.true_weights = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, num_classes=self.num_classes, num_features=self.num_features, noise_sigma=10.)
         self.Xs_conv, self.ys_labels_conv = mi.validate_and_format_Xs_ys(Xs_conv, ys_labels_conv)
 
     def test_conv_layer_always_covers_entire_input_row(self):
+        if self.num_classes == self.num_features:
+            raise Exception('test isnt valid if num features equals num classes')
+       
         Xs_shape = [None] + list(self.Xs_conv.values.shape[1:])
         x = tf.placeholder(tf.float32, Xs_shape)
         x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
@@ -135,7 +140,7 @@ class TestConvModel(unittest.TestCase):
             layer_defs = map(lambda x: ('name', x), conv_struct)          
             layer = reduce(lambda inp, ld: md.create_conv_layer(inp, ld[0], ld[1]), layer_defs, x_4d)
             init_fc_layer = md.flatten_conv_layer(layer)
-            exp_shape = Xs_shape[1] * conv_struct[-1]
+            exp_shape = self.num_classes * conv_struct[-1]
             act_shape = init_fc_layer._shape[1]._value
             self.assertEquals(exp_shape, act_shape)
 
