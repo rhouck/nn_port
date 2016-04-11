@@ -6,8 +6,8 @@ from toolz.curried import pipe, map
 def get_num_per_p_year(df):
     df = df.dropna(how='all')
     pers = df.shape[0]
-    years = (df.index[-1] - df.index[0]).days / 365.
-    years = years * (pers / (pers - 1.))
+    years_to_final_per = (df.index[-1] - df.index[0]).days / 365.
+    years = years_to_final_per * (pers / (pers - 1.))
     return int(round(pers / years))
 
 def get_ir(df):
