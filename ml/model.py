@@ -90,7 +90,7 @@ def validate_dtype(array):
     return array.dtype == np.float32
 
 def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
-                     penalty_alpha=0., dropout_rate=0., logdir=None):
+                     penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -165,7 +165,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             for i in xrange(iterations):
                 bXs, bys = get_batch(Xs_train, ys_train, batch_size)
                 _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
-                if i % 100 == 0:
+                if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     duration = time.time() - start_time
                     msg = 'step {0:>5}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'

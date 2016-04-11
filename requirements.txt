@@ -3,3 +3,4 @@ pandas
 cvxpy
 toolz
 tables
+scikit-learn

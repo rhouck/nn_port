@@ -1,19 +1,12 @@
 import pandas as pd
 import numpy as np
-from toolz.curried import pipe, map
 
-def map_to_date(returns, start_date, func):
-    """iteratively apply function to dataframe accross expanding window
-    return dataframe of func results by date 
-    (func results should be single dim vector)
-    """
-    date_index = returns[start_date:].index
-    p = dict(pipe(date_index,
-                  map(lambda x: (x, func(returns[:x])))))
-    try:
-        return pd.DataFrame(p).T
-    except:
-        return pd.Panel(p).transpose(0, 2, 1)
+
+def ts_score(df):
+    """full sample ts score"""
+    mean = df.mean(axis=0)
+    std = df.std(axis=0)
+    return (df.sub(mean, axis=1)).div(std, axis=1)
 
 def xs_score(df):
     mean = df.mean(axis=1)
