@@ -8,7 +8,7 @@ from itertools import product
 import utils as ut
 
 
-def calc_opt_weights(df, alpha=0, norm_type=2):    
+def calc_opt_weights(df, alpha=0, norm_type=2, long_only=True):    
     """returns optimal weights of returns df with optional regularization
     inputs:
         df: a dataframe of returns
@@ -30,11 +30,20 @@ def calc_opt_weights(df, alpha=0, norm_type=2):
     w = cv.Variable(df.shape[1])
     reg = cv.norm(w, norm_type)
     objective = cv.Minimize(cv.sum_squares(X*w - y) + alpha*reg)
-    constraints = [0 <= w, sum(w) == 1]
+    
+    if long_only:
+        constraints = [0 <= w, sum(w) == 1]
+    else: 
+        constraints = [sum(w) == 0]
+    
     prob = cv.Problem(objective, constraints)
-
     result = prob.solve()
-    return pd.Series(np.asarray(w.value).flatten(), index=df.columns)
+    
+    weights = pd.Series(np.asarray(w.value).flatten(), index=df.columns)
+    if not long_only:
+        weights = weights / weights[weights > 0].sum()
+    
+    return weights
 
 def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
     """applies opt_weights_func to rolling window on pandas df"""

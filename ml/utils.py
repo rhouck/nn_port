@@ -1,5 +1,7 @@
 import math
 
+import numpy as np
+import pandas as pd
 from toolz.curried import pipe, map
 
 
@@ -24,6 +26,13 @@ def calc_turnover(df):
 def calc_annual_turnover(df):
     to = calc_turnover(df)
     return to.mean() * get_num_per_p_year(df)
+
+def get_mean_var_tilt_holdings(df, halflife=24*22):
+    alphas = np.ones(df.shape[1])
+    cov_pn = pd.ewmcov(df, halflife=halflife, min_periods=halflife / 4).dropna(how='all')
+    holdings = pd.DataFrame({date: cov_pn[date].dot(alphas) for date in cov_pn.items}).T
+    scaler = 1 / holdings.sum(axis=1)
+    return holdings.mul(scaler, axis=0)
 
 def map_to_date(returns, start_date, func):
     """iteratively apply function to dataframe accross expanding window

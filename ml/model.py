@@ -89,8 +89,8 @@ def flatten_conv_layer(layer):
 def validate_dtype(array):
     return array.dtype == np.float32
 
-def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
-                     penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100):
+def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, penalty_alpha=0., dropout_rate=0., 
+                     final_layer_activation='softmax_linear', logdir=None, verbosity=100):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -137,9 +137,12 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             
             # define fully connected hidden layers and final softmax layer
             fc_layer_defs = define_layers('fully_connected', fc_struct, tf.sigmoid, penalty_alpha, dropout_rate)
-            fc_layer_defs.append(['softmax_linear', ys_train.shape[1], None, penalty_alpha, dropout_rate])
+            fc_layer_defs.append([final_layer_activation, ys_train.shape[1], None, penalty_alpha, dropout_rate])
             logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
-            y = tf.nn.softmax(logits)
+            if final_layer_activation == 'sigmoid':
+                y = tf.sigmoid(logits)
+            elif final_layer_activation == 'softmax_linear':
+                y = tf.nn.softmax(logits)
             _ = tf.histogram_summary('y', y)
              
             # set up objective function and items to measure
