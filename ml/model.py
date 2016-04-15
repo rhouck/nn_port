@@ -13,7 +13,7 @@ def get_penalties(items, name, alpha):
     """returns penalties for a given set of weights or biases"""
     penalties = tf.nn.l2_loss(items) * alpha
     name = 'l2_{0}_pen'.format(name)
-    _ = tf.histogram_summary(name, penalties)
+    #_ = tf.histogram_summary(name, penalties)
     return penalties
 
 def calc_loss(logits, y_):
@@ -41,7 +41,6 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
         logits = tf.matmul(input, weights) + biases
         response = activation(logits) if activation else logits
         if dropout_rate: 
-            print "applying dropout"
             response = tf.nn.dropout(response, 1. - dropout_rate)
 
         penalties = []

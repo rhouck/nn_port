@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from toolz.curried import pipe, map
 
+sigmoid = lambda x: 1. / (1. + math.exp(-x))
+from_sigmoid = lambda x: -1. * math.log((1 / x) - 1)
 
 def get_num_per_p_year(df):
     df = df.dropna(how='all')
