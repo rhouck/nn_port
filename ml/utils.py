@@ -36,6 +36,11 @@ def get_mean_var_tilt_holdings(df, halflife=24*22):
     scaler = 1 / holdings.sum(axis=1)
     return holdings.mul(scaler, axis=0)
 
+def calc_ratio_above_zero(df):
+    pos_val = df.applymap(lambda x: 1 if x >= 0 else 0)
+    pos_val_sum = pos_val.sum(axis=0)
+    return pos_val_sum / float(df.shape[0])
+
 def map_to_date(returns, start_date, func):
     """iteratively apply function to dataframe accross expanding window
     return dataframe of func results by date 
