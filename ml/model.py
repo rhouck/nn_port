@@ -170,7 +170,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, p
                 if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     duration = time.time() - start_time
-                    msg = 'step {0:>5}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'
+                    msg = 'step {0:>7}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'
                     print(msg.format(i, train_loss_value, test_loss_value, duration))
                     if logdir:
                         summary_str = sess.run(summary_op, feed_dict=train_feed_dict)

@@ -4,10 +4,11 @@ import datetime
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 import ml.model_inputs as mi
 import ml.model as md
-import tensorflow as tf
+import ml.utils as ut
 from gen_data import *
 
 
@@ -19,6 +20,7 @@ class TestFCModel(unittest.TestCase):
         self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
         self.ys_probs = gen_random_probs(self.dti, 10)
         self.ys_labels = gen_random_onehot(self.dti, 10)
+        self.ys_labels_short = gen_random_onehot(self.dti, 5)
         Xs = gen_random_normal(self.dti, 20)
         self.Xs, _ = mi.validate_and_format_Xs_ys(Xs, self.ys_probs)
 
@@ -118,6 +120,21 @@ class TestFCModel(unittest.TestCase):
     def test_model_structure_matches_inputs(self):
         self.assertTrue(False)
         
+    def test_high_regularization_pentalty_leads_to_near_zero_holdings_for_sigmoid_output_layer(self):
+        inp = self.ys_labels.astype(np.float32).values
+        preds, stats = md.train_nn_softmax([inp], [inp], [[],[]], 2000, 1000, .1, penalty_alpha=5.,
+                                        final_layer_activation='sigmoid', verbosity=1000)
+        self.assertTrue(abs(pd.DataFrame(preds['train']['weights']).stack().mean() - .5) < 1e-3)
+    
+    def test_sigmoid_output_layer_predicts_greater_point_5_equal_to_proportion_of_true_values(self):
+        inp = self.ys_labels_short.astype(np.float32).values
+        preds, _ = md.train_nn_softmax([inp], [inp], [[],[20, 20]], 10000, 1000, 2., 
+                                       final_layer_activation='sigmoid', verbosity=1000)
+        true_ratio = pd.DataFrame(inp).sum() / pd.DataFrame(inp).shape[0]
+        train_probs = pd.DataFrame(preds['train']['weights'])
+        ratio_above_one_half = ut.calc_ratio_above_zero(train_probs  - .5)
+        self.assertTrue(all((true_ratio - ratio_above_one_half).abs() < 1e-3))
+
     
 class TestConvModel(unittest.TestCase):
     

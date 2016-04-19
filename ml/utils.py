@@ -37,7 +37,8 @@ def get_mean_var_tilt_holdings(df, halflife=24*22):
     return holdings.mul(scaler, axis=0)
 
 def calc_ratio_above_zero(df):
-    pos_val = df.applymap(lambda x: 1 if x >= 0 else 0)
+    df = df.replace(0, np.nan).dropna()
+    pos_val = df.applymap(lambda x: 1 if x > 0 else 0)
     pos_val_sum = pos_val.sum(axis=0)
     return pos_val_sum / float(df.shape[0])
 

@@ -74,6 +74,7 @@ class TestModelInputs(unittest.TestCase):
         with self.assertRaises(ValueError):
             mi.validate_and_format_Xs_ys(self.Xs_pn, self.ys_labels.iloc[:,:5])
 
+
 class TestDataGeneration(unittest.TestCase):
     
     def setUp(self):
