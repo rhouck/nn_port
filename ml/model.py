@@ -59,7 +59,7 @@ def add_fc_layer_and_penalties(inp, *layer_def_args):
     penalties = existing_penalties + new_penalties
     return model, penalties
 
-def create_conv_layer(input, name, out_depth):
+def create_conv_layer(input, name, out_depth, activation):
     with tf.name_scope(name):
         width = input._shape[2]._value
         inp_depth = input._shape[3]._value
@@ -71,7 +71,8 @@ def create_conv_layer(input, name, out_depth):
         #_ = tf.histogram_summary('biases', biases)
         
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
-        return tf.nn.relu(conv2d + biases)
+        return activation(conv2d + biases)
+        #return tf.nn.relu(conv2d + biases)
 
 def define_layers(base_name, layer_structure, *args):
     """returns list of lists of inputs to feed 'add layer' functions""" 
@@ -88,8 +89,11 @@ def flatten_conv_layer(layer):
 def validate_dtype(array):
     return array.dtype == np.float32
 
-def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, penalty_alpha=0., dropout_rate=0., 
-                     final_layer_activation='softmax_linear', logdir=None, verbosity=100):
+def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
+                     penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
+                     conv_layer_activation=tf.nn.relu,
+                     fc_hidden_layer_activation=tf.sigmoid, 
+                     fc_final_layer_activation=tf.nn.softmax):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -127,7 +131,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, p
 
             # define and create convolution layers if needed
             if conv_struct:
-                conv_layer_defs = define_layers('conv_layer', conv_struct)
+                conv_layer_defs = define_layers('conv_layer', conv_struct, conv_layer_activation)
                 x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
                 final_conv_layer = combine_layers(create_conv_layer, conv_layer_defs, x_4d)
                 init_fc_layer = flatten_conv_layer(final_conv_layer)
@@ -135,13 +139,10 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, p
                 init_fc_layer = x
             
             # define fully connected hidden layers and final softmax layer
-            fc_layer_defs = define_layers('fully_connected', fc_struct, tf.sigmoid, penalty_alpha, dropout_rate)
-            fc_layer_defs.append([final_layer_activation, ys_train.shape[1], None, penalty_alpha, dropout_rate])
+            fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation, penalty_alpha, dropout_rate)
+            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, penalty_alpha, dropout_rate])
             logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
-            if final_layer_activation == 'sigmoid':
-                y = tf.sigmoid(logits)
-            elif final_layer_activation == 'softmax_linear':
-                y = tf.nn.softmax(logits)
+            y = fc_final_layer_activation(logits)
             _ = tf.histogram_summary('y', y)
              
             # set up objective function and items to measure

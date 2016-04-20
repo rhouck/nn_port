@@ -114,22 +114,22 @@ class TestFCModel(unittest.TestCase):
             res.append(1. - stats['train']['accuracy'])
         self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
 
-    def test_dropout_is_only_applied_to_train_model_not_test(self):
-        self.assertTrue(False)
+    # def test_dropout_is_only_applied_to_train_model_not_test(self):
+    #     self.assertTrue(False)
 
-    def test_model_structure_matches_inputs(self):
-        self.assertTrue(False)
+    # def test_model_structure_matches_inputs(self):
+    #     self.assertTrue(False)
         
     def test_high_regularization_pentalty_leads_to_near_zero_holdings_for_sigmoid_output_layer(self):
         inp = self.ys_labels.astype(np.float32).values
         preds, stats = md.train_nn_softmax([inp], [inp], [[],[]], 2000, 1000, .1, penalty_alpha=5.,
-                                        final_layer_activation='sigmoid', verbosity=1000)
+                                        fc_final_layer_activation=tf.sigmoid, verbosity=1000)
         self.assertTrue(abs(pd.DataFrame(preds['train']['weights']).stack().mean() - .5) < 1e-3)
     
     def test_sigmoid_output_layer_predicts_greater_point_5_equal_to_proportion_of_true_values(self):
         inp = self.ys_labels_short.astype(np.float32).values
         preds, _ = md.train_nn_softmax([inp], [inp], [[],[20, 20]], 10000, 1000, 2., 
-                                       final_layer_activation='sigmoid', verbosity=1000)
+                                       fc_final_layer_activation=tf.sigmoid, verbosity=1000)
         true_ratio = pd.DataFrame(inp).sum() / pd.DataFrame(inp).shape[0]
         train_probs = pd.DataFrame(preds['train']['weights'])
         ratio_above_one_half = ut.calc_ratio_above_zero(train_probs  - .5)
@@ -155,7 +155,7 @@ class TestConvModel(unittest.TestCase):
         x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
         for conv_struct in ([2,], [2,4]):    
             layer_defs = map(lambda x: ('name', x), conv_struct)          
-            layer = reduce(lambda inp, ld: md.create_conv_layer(inp, ld[0], ld[1]), layer_defs, x_4d)
+            layer = reduce(lambda inp, ld: md.create_conv_layer(inp, ld[0], ld[1], tf.nn.relu), layer_defs, x_4d)
             init_fc_layer = md.flatten_conv_layer(layer)
             exp_shape = self.num_classes * conv_struct[-1]
             act_shape = init_fc_layer._shape[1]._value
