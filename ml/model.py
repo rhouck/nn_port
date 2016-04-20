@@ -16,10 +16,19 @@ def get_penalties(items, name, alpha):
     #_ = tf.histogram_summary(name, penalties)
     return penalties
 
-def calc_loss(logits, y_):
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name='xentropy')
-    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-    return loss
+def calc_loss(logits, y_, fc_final_layer_activation):
+
+    if fc_final_layer_activation.__name__ == 'softmax':
+        name ='softmax_xentropy'
+        loss_func = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name=name)
+    elif fc_final_layer_activation.__name__ == 'sigmoid':
+        name = 'sigmoid_xentropy'
+        loss_func = tf.nn.sigmoid_cross_entropy_with_logits(logits, y_, name=name)
+    else:
+        raise Exception('no appropriate loss function paired with this activation')
+    
+    loss_objective = tf.reduce_mean(loss_func, name=name + '_mean')
+    return loss_objective
 
 def tracked_train_step(loss, learning_rate):
     _ = tf.scalar_summary(loss.op.name, loss)
@@ -72,7 +81,6 @@ def create_conv_layer(input, name, out_depth, activation):
         
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         return activation(conv2d + biases)
-        #return tf.nn.relu(conv2d + biases)
 
 def define_layers(base_name, layer_structure, *args):
     """returns list of lists of inputs to feed 'add layer' functions""" 
@@ -146,9 +154,9 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             _ = tf.histogram_summary('y', y)
              
             # set up objective function and items to measure
-            loss = calc_loss(logits, y_) + sum(penalties)
+            loss = calc_loss(logits, y_, fc_final_layer_activation) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
-            _ = tf.scalar_summary('cross_entropy', loss)
+            _ = tf.scalar_summary('loss', loss)
             
             correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
