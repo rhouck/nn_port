@@ -43,3 +43,12 @@ def check_kernel_predictive_accuracy(Xs, ys, true_weights):
                        'ys': ys.apply(lambda x: list(x).index(max(x)), axis=1)})
     matches = df.apply(lambda x: x[0]==x[1], axis=1)
     return float(matches.sum()) / matches.shape[0]
+
+def gen_correlated_series(s, r):
+    mu = s.mean()
+    sig = s.std()
+    synth = pd.Series(sig * np.random.randn(s.shape[0]) + mu, index=s.index)
+    draw = pd.Series(np.random.rand(s.shape[0]), index=s.index)
+    df = pd.concat([s, synth, draw], axis=1)
+    df.columns = ['real', 'synth', 'draw']
+    return df.apply(lambda x: x['real'] if x['draw'] <= r else x['synth'], axis=1)

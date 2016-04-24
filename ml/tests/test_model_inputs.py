@@ -73,21 +73,3 @@ class TestModelInputs(unittest.TestCase):
     def test_panel_Xs_and_ys_must_have_same_num_classes(self):
         with self.assertRaises(ValueError):
             mi.validate_and_format_Xs_ys(self.Xs_pn, self.ys_labels.iloc[:,:5])
-
-
-class TestDataGeneration(unittest.TestCase):
-    
-    def setUp(self):
-        np.random.seed(0)
-        self.dti = pd.DatetimeIndex(start='2000-1-1', freq='B', periods=1000)
-
-    def test_kernel_has_perfect_pred_power_with_no_noise(self):
-        Xs, ys, tw = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, 15, 10, 0.)
-        self.assertEquals(check_kernel_predictive_accuracy(Xs, ys, tw), 1.)
-
-    def test_adding_noise_reduces_kernel_predicted_power(self):    
-        accs = []
-        for i in (100., 10., 1., 0.):
-            Xs, ys, tw = gen_2d_random_Xs_onehot_ys_from_random_kernel(self.dti, 15, 10, i)
-            accs.append(check_kernel_predictive_accuracy(Xs, ys, tw))
-        self.assertEquals(sorted(accs), accs)
