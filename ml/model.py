@@ -5,9 +5,10 @@ import numpy as np
 import tensorflow as tf
 
 
-def get_batch(Xs, ys, batch_size):
+def get_batch(Xs, ys, returns, batch_size):
     inds = np.random.choice(Xs.shape[0], batch_size, replace=True)
-    return Xs[inds,:], ys[inds,:]
+    return Xs[inds,:], ys[inds,:], returns[inds,:]
+
 
 def get_penalties(items, name, alpha):
     """returns penalties for a given set of weights or biases"""
@@ -17,15 +18,15 @@ def get_penalties(items, name, alpha):
     return penalties
 
 def calc_loss(logits, y_, fc_final_layer_activation):
-
-    if fc_final_layer_activation.__name__ == 'softmax':
+    if fc_final_layer_activation is None:
+        name = 'squared_error'
+        loss_func = tf.square(logits - y_, name=name)
+    elif fc_final_layer_activation.__name__ == 'softmax':
         name ='softmax_xentropy'
         loss_func = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name=name)
     elif fc_final_layer_activation.__name__ == 'sigmoid':
         name = 'sigmoid_xentropy'
         loss_func = tf.nn.sigmoid_cross_entropy_with_logits(logits, y_, name=name)
-        # name = 'mean_squared'
-        # loss_func = tf.square(fc_final_layer_activation(logits) - y_, name=name)
     else:
         raise Exception('no appropriate loss function paired with this activation')
     loss_objective = tf.reduce_mean(loss_func, name=name + '_mean')
@@ -98,12 +99,13 @@ def flatten_conv_layer(layer):
 def validate_dtype(array):
     return array.dtype == np.float32
 
-def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate, 
-                     penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
-                     conv_layer_activation=tf.nn.relu,
-                     fc_hidden_layer_activation=tf.sigmoid, 
-                     fc_final_layer_activation=tf.nn.softmax,
-                     performance_funcs={}):
+def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate, 
+             penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
+             conv_layer_activation=tf.nn.relu,
+             fc_hidden_layer_activation=tf.sigmoid, 
+             fc_final_layer_activation=tf.nn.softmax,
+             loss_func=calc_loss,
+             performance_funcs={}):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -111,10 +113,15 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
     """
 
     # input validation and formatting
-    Xs_train = Xs[0]
-    Xs_test = Xs[1] if len(Xs) > 1 else np.array([])
-    ys_train = ys[0]
-    ys_test = ys[1] if len(ys) > 1 else np.array([])
+    def split_train_test(array):
+        array_train = array[0]
+        array_test = array[1] if len(array) > 1 else np.array([])
+        return array_train, array_test
+    
+    Xs_train, Xs_test = split_train_test(Xs)
+    ys_train, ys_test = split_train_test(ys)
+    returns_train, returns_test = split_train_test(returns)
+    
     for i in (Xs_train, Xs_test):
         if i.any() and not validate_dtype(i):
             raise TypeError('Xs must be numpy float32 type')
@@ -152,11 +159,11 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation, penalty_alpha, dropout_rate)
             fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, penalty_alpha, dropout_rate])
             logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
-            y = fc_final_layer_activation(logits)
+            y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
              
             # set up objective function and items to measure
-            loss = calc_loss(logits, y_, fc_final_layer_activation) + sum(penalties)
+            loss = loss_func(logits, y_, fc_final_layer_activation) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
             _ = tf.scalar_summary('loss', loss)
             
@@ -176,7 +183,7 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
             train_feed_dict={x: Xs_train, y_: ys_train}
             test_feed_dict={x: Xs_test, y_: ys_test}
             for i in xrange(iterations):
-                bXs, bys = get_batch(Xs_train, ys_train, batch_size)
+                bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
                 _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
                 if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
