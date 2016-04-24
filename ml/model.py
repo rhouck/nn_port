@@ -24,9 +24,10 @@ def calc_loss(logits, y_, fc_final_layer_activation):
     elif fc_final_layer_activation.__name__ == 'sigmoid':
         name = 'sigmoid_xentropy'
         loss_func = tf.nn.sigmoid_cross_entropy_with_logits(logits, y_, name=name)
+        # name = 'mean_squared'
+        # loss_func = tf.square(fc_final_layer_activation(logits) - y_, name=name)
     else:
         raise Exception('no appropriate loss function paired with this activation')
-    
     loss_objective = tf.reduce_mean(loss_func, name=name + '_mean')
     return loss_objective
 
@@ -101,7 +102,8 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                      penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
                      conv_layer_activation=tf.nn.relu,
                      fc_hidden_layer_activation=tf.sigmoid, 
-                     fc_final_layer_activation=tf.nn.softmax):
+                     fc_final_layer_activation=tf.nn.softmax,
+                     performance_funcs={}):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
     structure: list contianing convlayers depth and hidden layers depth
@@ -179,8 +181,15 @@ def train_nn_softmax(Xs, ys, structure, iterations, batch_size, learning_rate,
                 if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     duration = time.time() - start_time
-                    msg = 'step {0:>7}:\ttrain loss: {1:.2f}\ttest loss: {2:.2f}\t\t({3:.2f} sec)'
-                    print(msg.format(i, train_loss_value, test_loss_value, duration))
+                    
+                    msg = 'step {0:>7}:\t'.format(i)
+                    for j in (('train', train_feed_dict), ('test', test_feed_dict)):
+                        pred = sess.run(y, j[1])
+                        for k, v in performance_funcs.items():
+                            msg += '{0} {1}: {2:.2f}\t'.format(j[0], k, v(pred))
+                    msg += 'train loss: {0:.4f}\ttest loss: {1:.4f}\t({2:.2f} sec)'
+                    print(msg.format(train_loss_value, test_loss_value, duration))
+                    
                     if logdir:
                         summary_str = sess.run(summary_op, feed_dict=train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
