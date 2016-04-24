@@ -52,8 +52,8 @@ def clear_path(path):
         except Exception, e:
             print e
 
-def validate_and_format_Xs_ys(Xs, ys):
-    inps = (Xs, ys)
+def validate_and_format_inputs(Xs, ys, returns):
+    inps = (Xs, ys, returns)
     for i in inps:
         if i.isnull().values.any():
             raise ValueError("model inputs cannot contain nans")
@@ -67,10 +67,11 @@ def validate_and_format_Xs_ys(Xs, ys):
     ind = pd.DatetimeIndex(sorted(set(inds[0]) & set(inds[1])))
     Xs = get_by_date(ind, Xs).astype(np.float32)
     ys = get_by_date(ind, ys)
+    returns = get_by_date(ind, returns)
     
-    return Xs, ys
+    return Xs, ys, returns
 
-def split_inputs_by_date(Xs, ys, split_date, buffer_periods=0):
+def split_inputs_by_date(Xs, ys, returns, split_date, buffer_periods=0):
     """splits Xs and ys by 'split_date' - 'buffer_periods'"""    
     date_ind = get_date_index(Xs).to_series()
     try:
@@ -82,7 +83,9 @@ def split_inputs_by_date(Xs, ys, split_date, buffer_periods=0):
     train_split_ind = test_split_ind - buffer_periods
     Xs_train = Xs.iloc[:train_split_ind]
     ys_train = ys.iloc[:train_split_ind]
+    returns_train = returns.iloc[:train_split_ind]
     Xs_test = Xs.iloc[test_split_ind:]
     ys_test = ys.iloc[test_split_ind:]
+    returns_test = returns.iloc[test_split_ind:]
     
-    return ((Xs_train, ys_train), (Xs_test, ys_test))
+    return ((Xs_train, ys_train, returns_train), (Xs_test, ys_test, returns_test))

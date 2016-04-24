@@ -9,7 +9,6 @@ def get_batch(Xs, ys, returns, batch_size):
     inds = np.random.choice(Xs.shape[0], batch_size, replace=True)
     return Xs[inds,:], ys[inds,:], returns[inds,:]
 
-
 def get_penalties(items, name, alpha):
     """returns penalties for a given set of weights or biases"""
     penalties = tf.nn.l2_loss(items) * alpha
@@ -140,6 +139,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
 
             # setup placeholders
             y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]])
+            returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]])
             Xs_shape = [None] + list(Xs_train.shape[1:])
             x = tf.placeholder(tf.float32, Xs_shape)
             
@@ -180,11 +180,11 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             start_time = time.time()
             init = tf.initialize_all_variables()
             sess.run(init)
-            train_feed_dict={x: Xs_train, y_: ys_train}
-            test_feed_dict={x: Xs_test, y_: ys_test}
+            train_feed_dict={x: Xs_train, y_: ys_train, returns_: returns_train}
+            test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test}
             for i in xrange(iterations):
                 bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
-                _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys})
+                _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys, returns_: brets})
                 if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     duration = time.time() - start_time
