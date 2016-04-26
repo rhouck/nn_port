@@ -16,14 +16,14 @@ def get_penalties(items, name, alpha):
     #_ = tf.histogram_summary(name, penalties)
     return penalties
 
-def calc_loss(logits, y, y_, returns_, fc_final_layer_activation):
-    if fc_final_layer_activation is None:
+def calc_loss(logits, y, y_, returns_, activation):
+    if activation is None:
         name = 'squared_error'
         loss_func = tf.square(y - y_, name=name)
-    elif fc_final_layer_activation.__name__ == 'softmax':
+    elif activation.__name__ == 'softmax':
         name ='softmax_xentropy'
         loss_func = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name=name)
-    elif fc_final_layer_activation.__name__ == 'sigmoid':
+    elif activation.__name__ == 'sigmoid':
         name = 'sigmoid_xentropy'
         loss_func = tf.nn.sigmoid_cross_entropy_with_logits(logits, y_, name=name)
     else:
@@ -38,17 +38,31 @@ def tracked_train_step(loss, learning_rate):
     train_step = optimizer.minimize(loss, global_step=global_step)
     return train_step
 
-def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
+def get_initial_weights_and_biases(weights_dim, activation):
+    stddev = 1.0 / math.sqrt(float(weights_dim[-2]))
+    if activation is None or activation.__name__ == 'sigmoid':
+        weights = tf.random_normal(weights_dim, stddev=stddev)
+        biases = tf.zeros([weights_dim[-1]])
+    elif activation.__name__ == 'relu':
+        weights = tf.truncated_normal(weights_dim, stddev=stddev)
+        biases = tf.constant(.1, shape=[weights_dim[-1]])
+    else:
+        raise Exception('get init weights not yet implemented for this activation')
+    weights = tf.Variable(weights, name='weights')
+    biases = tf.Variable(biases, name='biases')
+    return weights, biases
+
+def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_biases=True):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
-        stddev = 1.0 / math.sqrt(float(in_size))
-        weights = tf.Variable(tf.random_normal(weights_dim, stddev=stddev), name='weights')
-        biases = tf.Variable(tf.zeros([out_size]), name='biases')
+        weights, biases = get_initial_weights_and_biases(weights_dim, activation)
         #_ = tf.histogram_summary('weights', weights)
-        #_ = tf.histogram_summary('biases', biases)
-
-        logits = tf.matmul(input, weights) + biases
+        logits = tf.matmul(input, weights)
+        if add_biases:
+            #_ = tf.histogram_summary('biases', biases)
+            logits += biases
+        
         response = activation(logits) if activation else logits
         if dropout_rate: 
             response = tf.nn.dropout(response, 1. - dropout_rate)
@@ -73,13 +87,10 @@ def create_conv_layer(input, name, out_depth, activation):
     with tf.name_scope(name):
         width = input._shape[2]._value
         inp_depth = input._shape[3]._value
-        stddev = 1.0 / math.sqrt(float(inp_depth))
-        initial_weights = tf.random_normal([1, width, inp_depth, out_depth], stddev=stddev)
-        weights = tf.Variable(initial_weights, name='weights')
-        biases = tf.Variable(tf.zeros([out_depth]), name='biases')
+        weights_dim = [1, width, inp_depth, out_depth]
+        weights, biases = get_initial_weights_and_biases(weights_dim, activation)
         #_ = tf.histogram_summary('weights', weights)
         #_ = tf.histogram_summary('biases', biases)
-        
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         return activation(conv2d + biases)
 
@@ -157,7 +168,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             
             # define fully connected hidden layers and final softmax layer
             fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation, penalty_alpha, dropout_rate)
-            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, penalty_alpha, dropout_rate])
+            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, penalty_alpha, dropout_rate, False])
             logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
@@ -194,7 +205,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
                         pred = sess.run(y, j[1])
                         for k, v in performance_funcs.items():
                             msg += '{0} {1}: {2:.2f}\t'.format(j[0], k, v(pred))
-                    msg += 'train loss: {0:.4f}\ttest loss: {1:.4f}\t({2:.2f} sec)'
+                    msg += 'train loss: {0:.5f}\ttest loss: {1:.5f}\t({2:.2f} sec)'
                     print(msg.format(train_loss_value, test_loss_value, duration))
                     
                     if logdir:
