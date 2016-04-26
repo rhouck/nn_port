@@ -53,10 +53,10 @@ def rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per):
              map(lambda x: {df.index[x]: opt_weights_func(df.iloc[x:x+look_ahead_per+1])}))
     return pd.DataFrame(merge(p)).T
 
-def calc_opt_weight_portfolio_ir(df, alpha, norm_type, look_ahead_per, tilt_weights=None):
+def calc_opt_weight_portfolio_ir(df, alpha, norm_type, look_ahead_per, long_only=True, tilt_weights=None):
     """calculates ir for optimal portfolio 
     determined by alpha, norm_type, look_ahead_per"""
-    opt_weights_func = lambda x: calc_opt_weights(x, alpha=alpha, norm_type=norm_type)
+    opt_weights_func = lambda x: calc_opt_weights(x, alpha=alpha, norm_type=norm_type, long_only=long_only)
     weights = rolling_fit_opt_weights(df, opt_weights_func, look_ahead_per=look_ahead_per)
     try:
         weights -= tilt_weights
@@ -64,13 +64,13 @@ def calc_opt_weight_portfolio_ir(df, alpha, norm_type, look_ahead_per, tilt_weig
         pass
     return ut.get_ir((df * weights).sum(axis=1))
 
-def opt_weight_ir_grid(df, alphas, look_ahead_pers, tilt_weights=None):
+def opt_weight_ir_grid(df, alphas, look_ahead_pers, long_only=True, tilt_weights=None):
     """exhaustive grid search over alphas, look_ahead_per, norm_types 
     returning dataframe of cumulative returns for each optimal portfolio construction"""
-    norm_types = [1,2]
+    norm_types = [2,]
     end_date = df.index[-(look_ahead_pers[-1] + 1)]
     p = pipe(product(alphas, norm_types, look_ahead_pers),
-             map(lambda x: list(x) + [calc_opt_weight_portfolio_ir(df, x[0], x[1], x[2], tilt_weights)]),
+             map(lambda x: list(x) + [calc_opt_weight_portfolio_ir(df, x[0], x[1], x[2], long_only, tilt_weights)]),
              map(lambda x: dict(zip(['alpha', 'norm_type', 'look_ahead_per', 'ir'], x))))
     return pd.DataFrame(list(p))
 

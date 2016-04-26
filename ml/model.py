@@ -16,10 +16,10 @@ def get_penalties(items, name, alpha):
     #_ = tf.histogram_summary(name, penalties)
     return penalties
 
-def calc_loss(logits, y_, fc_final_layer_activation):
+def calc_loss(logits, y, y_, returns_, fc_final_layer_activation):
     if fc_final_layer_activation is None:
         name = 'squared_error'
-        loss_func = tf.square(logits - y_, name=name)
+        loss_func = tf.square(y - y_, name=name)
     elif fc_final_layer_activation.__name__ == 'softmax':
         name ='softmax_xentropy'
         loss_func = tf.nn.softmax_cross_entropy_with_logits(logits, y_, name=name)
@@ -55,7 +55,7 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate):
 
         penalties = []
         if alpha:
-            i = ((weights, 'weights'), (biases, 'biases'))
+            i = ((weights, 'weights'),)# (biases, 'biases'))
             penalties = map(lambda x: get_penalties(x[0], x[1], alpha), i)
         
         return response, penalties
@@ -95,9 +95,6 @@ def flatten_conv_layer(layer):
     height = layer._shape[1]._value
     return tf.reshape(layer, [-1, depth*width*height])
 
-def validate_dtype(array):
-    return array.dtype == np.float32
-
 def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate, 
              penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
              conv_layer_activation=tf.nn.relu,
@@ -121,6 +118,9 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
     ys_train, ys_test = split_train_test(ys)
     returns_train, returns_test = split_train_test(returns)
     
+    def validate_dtype(array):
+        return array.dtype == np.float32
+
     for i in (Xs_train, Xs_test):
         if i.any() and not validate_dtype(i):
             raise TypeError('Xs must be numpy float32 type')
@@ -163,7 +163,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             _ = tf.histogram_summary('y', y)
              
             # set up objective function and items to measure
-            loss = loss_func(logits, y_, fc_final_layer_activation) + sum(penalties)
+            loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
             _ = tf.scalar_summary('loss', loss)
             
