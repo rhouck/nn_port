@@ -92,7 +92,9 @@ def create_conv_layer(input, name, out_depth, activation):
         #_ = tf.histogram_summary('weights', weights)
         #_ = tf.histogram_summary('biases', biases)
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
-        return activation(conv2d + biases)
+        logits = conv2d + biases
+        response = activation(logits) if activation else logits
+        return response
 
 def define_layers(base_name, layer_structure, *args):
     """returns list of lists of inputs to feed 'add layer' functions""" 
