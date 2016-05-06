@@ -64,9 +64,9 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_
             logits += biases
         
         response = activation(logits) if activation else logits
-        if dropout_rate: 
-            response = tf.nn.dropout(response, 1. - dropout_rate)
-
+        if dropout_rate:
+            response = tf.nn.dropout(response, 1. - dropout_rate) 
+        
         penalties = []
         if alpha:
             i = ((weights, 'weights'),)# (biases, 'biases'))
@@ -108,7 +108,7 @@ def flatten_conv_layer(layer):
     height = layer._shape[1]._value
     return tf.reshape(layer, [-1, depth*width*height])
 
-def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate, 
+def train_nn(data, structure, iterations, batch_size, learning_rate, 
              penalty_alpha=0., dropout_rate=0., logdir=None, verbosity=100, 
              conv_layer_activation=tf.nn.relu,
              fc_hidden_layer_activation=tf.sigmoid, 
@@ -124,12 +124,16 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
     # input validation and formatting
     def split_train_test(array):
         array_train = array[0]
-        array_test = array[1] if len(array) > 1 else np.array([])
+        array_test = array[1] if len(array) > 1 else np.array([[]])
         return array_train, array_test
     
-    Xs_train, Xs_test = split_train_test(Xs)
-    ys_train, ys_test = split_train_test(ys)
-    returns_train, returns_test = split_train_test(returns)
+    Xs_train, Xs_test = split_train_test(data[0])
+    ys_train, ys_test = split_train_test(data[1])
+    try:
+        returns_train, returns_test = split_train_test(data[2])
+    except:
+        returns_train = np.empty(ys_train.shape) * np.nan
+        returns_test = np.empty(ys_test.shape) * np.nan
     
     def validate_dtype(array):
         return array.dtype == np.float32
@@ -151,10 +155,10 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
         with tf.Session() as sess:           
 
             # setup placeholders
-            y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]])
-            returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]])
+            y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]], name='y_')
+            returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]], name='returns_')
             Xs_shape = [None] + list(Xs_train.shape[1:])
-            x = tf.placeholder(tf.float32, Xs_shape)
+            x = tf.placeholder(tf.float32, Xs_shape, name='x')
             
             def combine_layers(create_layer_func, layer_defs, inputs):
                 return reduce(lambda inp, ld: create_layer_func(inp, *ld), layer_defs, inputs)
@@ -183,7 +187,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             _ = tf.scalar_summary('accuracy', accuracy)
-            
+
             # record training statistics
             if logdir:
                 summary_op = tf.merge_all_summaries()
@@ -197,21 +201,24 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test}
             for i in xrange(iterations):
                 bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
-                _, train_loss_value = sess.run([train_step, loss], feed_dict={x: bXs, y_: bys, returns_: brets})
+                batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets}
+                _, train_loss_value = sess.run([train_step, loss], feed_dict=batch_train_feed_dict)
                 if verbosity and i % verbosity == 0:
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
-                    duration = time.time() - start_time
                     
+                    duration = time.time() - start_time
                     msg = 'step {0:>7}:\t'.format(i)
-                    for j in (('train', train_feed_dict), ('test', test_feed_dict)):
-                        pred = sess.run(y, j[1])
+                    for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
                         for k, v in performance_funcs.items():
-                            msg += '{0} {1}: {2:.2f}\t'.format(j[0], k, v(pred))
+                            kwargs = {k.name: k for k in j[1].keys()}
+                            kwargs['y'] = y
+                            res = sess.run(v(**kwargs), feed_dict=j[1])
+                            msg += '{0} {1}: {2:.2f}\t'.format(j[0], k, res)
                     msg += 'train loss: {0:.5f}\ttest loss: {1:.5f}\t({2:.2f} sec)'
                     print(msg.format(train_loss_value, test_loss_value, duration))
                     
                     if logdir:
-                        summary_str = sess.run(summary_op, feed_dict=train_feed_dict)
+                        summary_str = sess.run(summary_op, feed_dict=batch_train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
             
             # calc model predictions and summary stats
@@ -229,7 +236,7 @@ def train_nn(Xs, ys, returns, structure, iterations, batch_size, learning_rate,
             
             msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
             print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
-            msg = 'train loss:\t{0:.2f}\ttest loss:\t{1:.2f}'
+            msg = 'train loss:\t{0:.5f}\ttest loss:\t{1:.5f}'
             print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
 
             return predictions, stats

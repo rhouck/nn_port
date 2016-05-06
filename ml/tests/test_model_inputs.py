@@ -20,21 +20,21 @@ class TestModelInputs(unittest.TestCase):
         
     def test_validation_doesnt_remove_or_distort_data_unnecessarilly(self):
         Xs = self.Xs.astype(np.float32)
-        ys = self.ys_labels
-        Xs_v, ys_v = mi.validate_and_format_Xs_ys(Xs, ys)
+        ys = self.ys_labels.astype(np.float32)
+        Xs_v, ys_v = mi.validate_and_format_inputs(Xs, ys)
         self.assertTrue(Xs_v.equals(Xs))
         self.assertTrue(ys_v.equals(ys))
 
     def test_validate_raises_exception_if_inputs_not_df_with_dt_index(self):
         with self.assertRaises(Exception):
-            _, _ = mi.validate_and_format_Xs_ys(self.Xs.values, self.ys_labels.values)
+            _, _ = mi.validate_and_format_inputs(self.Xs.values, self.ys_labels.values)
         Xs = self.Xs
         Xs.index = Xs.index.map(lambda x: str(x))
         with self.assertRaises(Exception):
-            _, _ = mi.validate_and_format_Xs_ys(Xs, self.ys_labels)
+            _, _ = mi.validate_and_format_inputs(Xs, self.ys_labels)
 
     def test_splits_dates_doesnt_create_train_test_overlap(self):
-        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, self.split_date, buffer_periods=0)
+        train, test = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, 0)
 
         def get_len_overlap(a, b):
             return len(set(a) & set(b))
@@ -47,8 +47,7 @@ class TestModelInputs(unittest.TestCase):
         
     def test_split_dates_buffer_reduces_train_ts_from_end(self):
         buffer_periods = 5
-        
-        train, test = mi.split_inputs_by_date(self.Xs, self.ys_labels, self.split_date, buffer_periods=buffer_periods)
+        train, test = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, buffer_periods)
         self.assertEquals(train[0].index[0], self.Xs.index[0])
         ind = self.Xs.index.to_series()
         self.assertEquals(test[0].index[0], ind.ix[self.split_date:][0])
@@ -57,13 +56,13 @@ class TestModelInputs(unittest.TestCase):
 
     def test_split_dates_works_on_panels(self):
         try:
-            mi.split_inputs_by_date(self.Xs_pn, self.ys_labels, self.split_date, buffer_periods=0)
+            mi.split_inputs_by_date([self.Xs_pn, self.ys_labels], self.split_date, 0)
         except Exception as err:
             raise Exception('split_inputs_by_date failed with panel input: {0}'.format(err))
 
     def test_split_dates_accepts_future_dates_by_returning_all_data_to_train_set(self):
         Xs_inp = self.Xs_pn
-        train, test = mi.split_inputs_by_date(Xs_inp, self.ys_labels, datetime.date(2050,1,1), buffer_periods=0)
+        train, test = mi.split_inputs_by_date([Xs_inp, self.ys_labels], datetime.date(2050,1,1), 0)
         inp_ind = mi.get_date_index(Xs_inp)
         train_ind =  mi.get_date_index(train[0])
         test_ind = mi.get_date_index(test[0])
@@ -72,4 +71,4 @@ class TestModelInputs(unittest.TestCase):
 
     def test_panel_Xs_and_ys_must_have_same_num_classes(self):
         with self.assertRaises(ValueError):
-            mi.validate_and_format_Xs_ys(self.Xs_pn, self.ys_labels.iloc[:,:5])
+            mi.validate_and_format_inputs(self.Xs_pn, self.ys_labels.iloc[:,:5])

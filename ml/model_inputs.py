@@ -52,28 +52,33 @@ def clear_path(path):
         except Exception, e:
             print e
 
-def validate_and_format_inputs(Xs, ys, returns):
-    inps = (Xs, ys, returns)
+def validate_and_format_inputs(*inps):
+    """checks model inputs are formatted properly"""
+    if len(inps) == 1 and isinstance(inps[0], (tuple, list)):
+        inps = inps[0]
+
+    shapes = []
     for i in inps:
         if i.isnull().values.any():
             raise ValueError("model inputs cannot contain nans")
         if not isinstance(get_date_index(i), pd.tseries.index.DatetimeIndex):
             raise ValueError("model inputs must contain datetime index")
-    if len(Xs.shape) == 3:
-        if Xs.shape[1] != ys.shape[1]:
-            raise ValueError("model inputs dimension mismatch (num classes must be equal)")
-    
-    inds = [get_date_index(i) for i in inps]
-    ind = pd.DatetimeIndex(sorted(set(inds[0]) & set(inds[1])))
-    Xs = get_by_date(ind, Xs).astype(np.float32)
-    ys = get_by_date(ind, ys)
-    returns = get_by_date(ind, returns)
-    
-    return Xs, ys, returns
+        shapes.append(i.shape)
 
-def split_inputs_by_date(Xs, ys, returns, split_date, buffer_periods=0):
-    """splits Xs and ys by 'split_date' - 'buffer_periods'"""    
-    date_ind = get_date_index(Xs).to_series()
+    # validate num classes in panel Xs matches num classes ys
+    a = any([len(i)==3 for i in shapes])
+    b = all([i[1]==shapes[0][1] for i in shapes])
+    if a and not b:
+        raise ValueError("model inputs dimension mismatch (num classes must be equal)")
+
+    inds = [set(get_date_index(i)) for i in inps]
+    ind = pd.DatetimeIndex(sorted(set.intersection(*inds)))
+    inps = [get_by_date(ind, i).astype(np.float32) for i in inps]   
+    return inps
+
+def split_inputs_by_date(inps, split_date, buffer_periods):
+    """splits Xs and ys by 'split_date' - 'buffer_periods'"""
+    date_ind = get_date_index(inps[0]).to_series()
     try:
         test_split_date = date_ind[split_date:][0]
         test_split_ind = date_ind.tolist().index(test_split_date)
@@ -81,11 +86,7 @@ def split_inputs_by_date(Xs, ys, returns, split_date, buffer_periods=0):
         test_split_ind = date_ind.shape[0]
         
     train_split_ind = test_split_ind - buffer_periods
-    Xs_train = Xs.iloc[:train_split_ind]
-    ys_train = ys.iloc[:train_split_ind]
-    returns_train = returns.iloc[:train_split_ind]
-    Xs_test = Xs.iloc[test_split_ind:]
-    ys_test = ys.iloc[test_split_ind:]
-    returns_test = returns.iloc[test_split_ind:]
     
-    return ((Xs_train, ys_train, returns_train), (Xs_test, ys_test, returns_test))
+    inps_train = [i.iloc[:train_split_ind] for i in inps]
+    inps_test = [i.iloc[test_split_ind:] for i in inps]
+    return inps_train, inps_test
