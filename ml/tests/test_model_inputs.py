@@ -34,25 +34,25 @@ class TestModelInputs(unittest.TestCase):
             _, _ = mi.validate_and_format_inputs(Xs, self.ys_labels)
 
     def test_splits_dates_doesnt_create_train_test_overlap(self):
-        train, test = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, 0)
+        inputs = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, 0)
 
         def get_len_overlap(a, b):
             return len(set(a) & set(b))
 
-        self.assertEquals(test[0].index[0], pd.to_datetime(self.split_date))
-        self.assertEquals(get_len_overlap(train[0].index, test[0].index), 0)
-        self.assertEquals(get_len_overlap(train[0].index, train[1].index), train[0].index.shape[0])
-        self.assertEquals(get_len_overlap(test[0].index, test[1].index), test[0].index.shape[0])
-        self.assertEquals(len(train[0].index) + len(test[0].index), len(self.Xs.index))
+        self.assertEquals(inputs[0][1].index[0], pd.to_datetime(self.split_date))
+        self.assertEquals(get_len_overlap(inputs[0][0].index, inputs[0][1].index), 0)
+        self.assertEquals(get_len_overlap(inputs[0][0].index, inputs[1][0].index), inputs[0][0].index.shape[0])
+        self.assertEquals(get_len_overlap(inputs[0][1].index, inputs[1][1].index), inputs[0][1].index.shape[0])
+        self.assertEquals(len(inputs[0][0].index) + len(inputs[0][1].index), len(self.Xs.index))
         
     def test_split_dates_buffer_reduces_train_ts_from_end(self):
         buffer_periods = 5
-        train, test = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, buffer_periods)
-        self.assertEquals(train[0].index[0], self.Xs.index[0])
+        inputs = mi.split_inputs_by_date([self.Xs, self.ys_labels], self.split_date, buffer_periods)
+        self.assertEquals(inputs[0][0].index[0], self.Xs.index[0])
         ind = self.Xs.index.to_series()
-        self.assertEquals(test[0].index[0], ind.ix[self.split_date:][0])
-        self.assertNotEquals(train[0].index[-1], ind.ix[:self.split_date][-2])
-        self.assertEquals(len(train[0].index) + len(test[0].index), len(self.Xs.index) - buffer_periods)
+        self.assertEquals(inputs[0][1].index[0], ind.ix[self.split_date:][0])
+        self.assertNotEquals(inputs[0][0].index[-1], ind.ix[:self.split_date][-2])
+        self.assertEquals(len(inputs[0][0].index) + len(inputs[0][1].index), len(self.Xs.index) - buffer_periods)
 
     def test_split_dates_works_on_panels(self):
         try:
@@ -62,13 +62,13 @@ class TestModelInputs(unittest.TestCase):
 
     def test_split_dates_accepts_future_dates_by_returning_all_data_to_train_set(self):
         Xs_inp = self.Xs_pn
-        train, test = mi.split_inputs_by_date([Xs_inp, self.ys_labels], datetime.date(2050,1,1), 0)
+        inputs = mi.split_inputs_by_date([Xs_inp, self.ys_labels], datetime.date(2050,1,1), 0)
         inp_ind = mi.get_date_index(Xs_inp)
-        train_ind =  mi.get_date_index(train[0])
-        test_ind = mi.get_date_index(test[0])
+        train_ind =  mi.get_date_index(inputs[0][0])
+        test_ind = mi.get_date_index(inputs[0][1])
         self.assertEquals(len(train_ind), len(inp_ind))
         self.assertEquals(len(test_ind), 0)
 
-    def test_panel_Xs_and_ys_must_have_same_num_classes(self):
-        with self.assertRaises(ValueError):
-            mi.validate_and_format_inputs(self.Xs_pn, self.ys_labels.iloc[:,:5])
+    # def test_panel_Xs_and_ys_must_have_same_num_classes(self):
+    #     with self.assertRaises(ValueError):
+    #         mi.validate_and_format_inputs(self.Xs_pn, self.ys_labels.iloc[:,:5])

@@ -65,11 +65,11 @@ def validate_and_format_inputs(*inps):
             raise ValueError("model inputs must contain datetime index")
         shapes.append(i.shape)
 
-    # validate num classes in panel Xs matches num classes ys
-    a = any([len(i)==3 for i in shapes])
-    b = all([i[1]==shapes[0][1] for i in shapes])
-    if a and not b:
-        raise ValueError("model inputs dimension mismatch (num classes must be equal)")
+    # # validate num classes in panel Xs matches num classes ys
+    # a = any([len(i)==3 for i in shapes])
+    # b = all([i[1]==shapes[0][1] for i in shapes])
+    # if a and not b:
+    #     raise ValueError("model inputs dimension mismatch (num classes must be equal)")
 
     inds = [set(get_date_index(i)) for i in inps]
     ind = pd.DatetimeIndex(sorted(set.intersection(*inds)))
@@ -89,4 +89,4 @@ def split_inputs_by_date(inps, split_date, buffer_periods):
     
     inps_train = [i.iloc[:train_split_ind] for i in inps]
     inps_test = [i.iloc[test_split_ind:] for i in inps]
-    return inps_train, inps_test
+    return zip(inps_train, inps_test)

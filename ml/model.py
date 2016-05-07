@@ -13,7 +13,7 @@ def get_penalties(items, name, alpha):
     """returns penalties for a given set of weights or biases"""
     penalties = tf.nn.l2_loss(items) * alpha
     name = 'l2_{0}_pen'.format(name)
-    #_ = tf.histogram_summary(name, penalties)
+    _ = tf.histogram_summary(name, penalties)
     return penalties
 
 def calc_loss(logits, y, y_, returns_, activation):
@@ -57,10 +57,10 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         weights, biases = get_initial_weights_and_biases(weights_dim, activation)
-        #_ = tf.histogram_summary('weights', weights)
+        _ = tf.histogram_summary(name + '_weights', weights)
         logits = tf.matmul(input, weights)
         if add_biases:
-            #_ = tf.histogram_summary('biases', biases)
+            _ = tf.histogram_summary(name + '_biases', biases)
             logits += biases
         
         response = activation(logits) if activation else logits
@@ -74,6 +74,21 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_
         
         return response, penalties
 
+def add_layer_reg(layer)
+
+def create_conv_layer(input, name, out_depth, activation):
+    with tf.name_scope(name):
+        width = input._shape[2]._value
+        inp_depth = input._shape[3]._value
+        weights_dim = [1, width, inp_depth, out_depth]
+        weights, biases = get_initial_weights_and_biases(weights_dim, activation)
+        _ = tf.histogram_summary(name + '_weights', weights)
+        _ = tf.histogram_summary(name + '_biases', biases)
+        conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
+        logits = conv2d + biases
+        response = activation(logits) if activation else logits
+        return response
+
 def add_fc_layer_and_penalties(inp, *layer_def_args):
     """feeds model layers into subsequent model layers while 
     collecting penalty objects to separately add to loss function"""
@@ -82,19 +97,6 @@ def add_fc_layer_and_penalties(inp, *layer_def_args):
     model, new_penalties = create_fc_layer(*create_fc_layer_inps)                    
     penalties = existing_penalties + new_penalties
     return model, penalties
-
-def create_conv_layer(input, name, out_depth, activation):
-    with tf.name_scope(name):
-        width = input._shape[2]._value
-        inp_depth = input._shape[3]._value
-        weights_dim = [1, width, inp_depth, out_depth]
-        weights, biases = get_initial_weights_and_biases(weights_dim, activation)
-        #_ = tf.histogram_summary('weights', weights)
-        #_ = tf.histogram_summary('biases', biases)
-        conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
-        logits = conv2d + biases
-        response = activation(logits) if activation else logits
-        return response
 
 def define_layers(base_name, layer_structure, *args):
     """returns list of lists of inputs to feed 'add layer' functions""" 
@@ -121,7 +123,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
     returns: dict of model predictions, dict of stats
     """
 
-    # input validation and formatting
+    # define inputs and model structure
     def split_train_test(array):
         array_train = array[0]
         array_test = array[1] if len(array) > 1 else np.array([[]])
@@ -135,13 +137,6 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
         returns_train = np.empty(ys_train.shape) * np.nan
         returns_test = np.empty(ys_test.shape) * np.nan
     
-    def validate_dtype(array):
-        return array.dtype == np.float32
-
-    for i in (Xs_train, Xs_test):
-        if i.any() and not validate_dtype(i):
-            raise TypeError('Xs must be numpy float32 type')
-    
     if structure and  all(isinstance(i, list) for i in structure):
         conv_struct = structure[0]
         fc_struct = structure[1]
@@ -151,7 +146,6 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
 
     
     with tf.Graph().as_default():
-
         with tf.Session() as sess:           
 
             # setup placeholders
@@ -179,6 +173,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
              
+
             # set up objective function and items to measure
             loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
             train_step = tracked_train_step(loss, learning_rate)
@@ -188,11 +183,16 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             _ = tf.scalar_summary('accuracy', accuracy)
 
+            for k, v in performance_funcs.items():
+                performance_funcs[k] = v(logits, y, y_, returns_)
+                _ = tf.scalar_summary(k, performance_funcs[k])                
+
             # record training statistics
             if logdir:
                 summary_op = tf.merge_all_summaries()
                 summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
             
+
             # train on batches
             start_time = time.time()
             init = tf.initialize_all_variables()
@@ -207,16 +207,16 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     
                     duration = time.time() - start_time
-                    msg = 'step {0:>7}:\t'.format(i)
-                    for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
-                        for k, v in performance_funcs.items():
-                            kwargs = {k.name: k for k in j[1].keys()}
-                            kwargs['y'] = y
-                            res = sess.run(v(**kwargs), feed_dict=j[1])
-                            msg += '{0} {1}: {2:.2f}\t'.format(j[0], k, res)
-                    msg += 'train loss: {0:.5f}\ttest loss: {1:.5f}\t({2:.2f} sec)'
-                    print(msg.format(train_loss_value, test_loss_value, duration))
-                    
+                    msg = 'step {0:>7}:\ttrain loss: {1:.5f}\ttest loss: {2:.5f}\t({3:.2f} sec)\n\t\t'
+                    msg = msg.format(i, train_loss_value, test_loss_value, duration)
+                    if performance_funcs:
+                        for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
+                            for k, v in performance_funcs.items():
+                                res = sess.run(v, feed_dict=j[1])
+                                msg += '{0} {1}: {2:.5f}\t'.format(j[0], k, res)
+                        msg += '\n'
+                    print msg
+
                     if logdir:
                         summary_str = sess.run(summary_op, feed_dict=batch_train_feed_dict)
                         summary_writer.add_summary(summary_str, i)     
