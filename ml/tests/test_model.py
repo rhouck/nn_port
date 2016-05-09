@@ -109,7 +109,7 @@ class TestFCModel(unittest.TestCase):
         inp = self.ys_labels.astype(np.float32).values
         res = []
         for dropout_rate in (0., .5, .99):
-            _, stats = md.train_nn([[inp], [inp]], [], 1000, 100, .5, dropout_rate=dropout_rate)
+            _, stats = md.train_nn([[inp], [inp]], [], 1000, 100, .5, train_dropout_rate=dropout_rate)
             res.append(1. - stats['train']['accuracy'])
         self.assertTrue(all(res[i] <= res[i+1] for i in xrange(len(res)-1)))
      
