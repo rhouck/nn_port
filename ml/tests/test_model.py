@@ -159,8 +159,8 @@ class TestConvModel(unittest.TestCase):
         x = tf.placeholder(tf.float32, Xs_shape)
         x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
         for conv_struct in ([2,], [2,4]):    
-            layer_defs = map(lambda x: ('name', x), conv_struct)          
-            layer = reduce(lambda inp, ld: md.create_conv_layer(inp, ld[0], ld[1], tf.nn.relu), layer_defs, x_4d)
+            layer_defs = map(lambda x: ('name', x), conv_struct)       
+            layer = reduce(lambda inp, ld: md.create_conv_layer(inp, ld[0], ld[1], tf.nn.relu)[0], layer_defs, x_4d)
             init_fc_layer = md.flatten_conv_layer(layer)
             exp_shape = self.num_classes * conv_struct[-1]
             act_shape = init_fc_layer._shape[1]._value

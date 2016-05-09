@@ -9,10 +9,10 @@ def get_batch(Xs, ys, returns, batch_size):
     inds = np.random.choice(Xs.shape[0], batch_size, replace=True)
     return Xs[inds,:], ys[inds,:], returns[inds,:]
 
-def get_penalties(items, name, alpha):
+def get_penalties(items, alpha):
     """returns penalties for a given set of weights or biases"""
     penalties = tf.nn.l2_loss(items) * alpha
-    name = 'l2_{0}_pen'.format(name)
+    name = 'l2_{0}_pen'.format(items.name.split(':')[0])
     _ = tf.histogram_summary(name, penalties)
     return penalties
 
@@ -52,7 +52,7 @@ def get_initial_weights_and_biases(weights_dim, activation):
     biases = tf.Variable(biases, name='biases')
     return weights, biases
 
-def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_biases=True):
+def create_fc_layer(input, name, out_size, activation, add_biases=True):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
@@ -62,19 +62,10 @@ def create_fc_layer(input, name, out_size, activation, alpha, dropout_rate, add_
         if add_biases:
             _ = tf.histogram_summary(name + '_biases', biases)
             logits += biases
-        
+        else:
+            biases = None
         response = activation(logits) if activation else logits
-        if dropout_rate:
-            response = tf.nn.dropout(response, 1. - dropout_rate) 
-        
-        penalties = []
-        if alpha:
-            i = ((weights, 'weights'),)# (biases, 'biases'))
-            penalties = map(lambda x: get_penalties(x[0], x[1], alpha), i)
-        
-        return response, penalties
-
-def add_layer_reg(layer)
+        return response, weights, biases
 
 def create_conv_layer(input, name, out_depth, activation):
     with tf.name_scope(name):
@@ -87,16 +78,23 @@ def create_conv_layer(input, name, out_depth, activation):
         conv2d = tf.nn.conv2d(input, weights, strides=[1, 1, 1, 1], padding='VALID')
         logits = conv2d + biases
         response = activation(logits) if activation else logits
-        return response
+        return response, weights, biases
 
-def add_fc_layer_and_penalties(inp, *layer_def_args):
+def add_layer(inp, layer_func, dropout_rate, *layer_def_args):
     """feeds model layers into subsequent model layers while 
-    collecting penalty objects to separately add to loss function"""
-    model, existing_penalties = inp             
-    create_fc_layer_inps = [model,] +  list(layer_def_args)
-    model, new_penalties = create_fc_layer(*create_fc_layer_inps)                    
-    penalties = existing_penalties + new_penalties
-    return model, penalties
+    consolidating weights and biases to calculate loss function penalties"""
+    layer, weights, biases = inp             
+    create_layer_inps = [layer,] +  list(layer_def_args)
+    layer, new_weights, new_biases = layer_func(*create_layer_inps)                    
+    layer = tf.nn.dropout(layer, 1. - dropout_rate)
+    if new_weights:
+        weights.append(new_weights)
+    if new_biases:
+        biases.append(new_biases)
+    return layer, weights, biases
+
+def combine_layers(create_layer_func, dropout_rate, layer_defs, inputs):
+    return reduce(lambda inp, ld: add_layer(inp, create_layer_func, dropout_rate, *ld), layer_defs, inputs)
 
 def define_layers(base_name, layer_structure, *args):
     """returns list of lists of inputs to feed 'add layer' functions""" 
@@ -144,99 +142,99 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
         conv_struct = None
         fc_struct = structure
 
+    penalties = []
     
-    with tf.Graph().as_default():
-        with tf.Session() as sess:           
+    with tf.Session() as sess:           
 
-            # setup placeholders
-            y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]], name='y_')
-            returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]], name='returns_')
-            Xs_shape = [None] + list(Xs_train.shape[1:])
-            x = tf.placeholder(tf.float32, Xs_shape, name='x')
-            
-            def combine_layers(create_layer_func, layer_defs, inputs):
-                return reduce(lambda inp, ld: create_layer_func(inp, *ld), layer_defs, inputs)
+        # setup placeholders
+        y_ = tf.placeholder(tf.float32, [None, ys_train.shape[1]], name='y_')
+        returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]], name='returns_')
+        Xs_shape = [None] + list(Xs_train.shape[1:])
+        x = tf.placeholder(tf.float32, Xs_shape, name='x')
 
-            # define and create convolution layers if needed
-            if conv_struct:
-                conv_layer_defs = define_layers('conv_layer', conv_struct, conv_layer_activation)
-                x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
-                final_conv_layer = combine_layers(create_conv_layer, conv_layer_defs, x_4d)
-                init_fc_layer = flatten_conv_layer(final_conv_layer)
-            else:
-                init_fc_layer = x
-            
-            # define fully connected hidden layers and final softmax layer
-            fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation, penalty_alpha, dropout_rate)
-            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, penalty_alpha, dropout_rate, False])
-            logits, penalties = combine_layers(add_fc_layer_and_penalties, fc_layer_defs, (init_fc_layer, []))
-            y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
-            _ = tf.histogram_summary('y', y)
-             
+        # define and create convolution layers if needed
+        if conv_struct:
+            conv_layer_defs = define_layers('conv_layer', conv_struct, conv_layer_activation)
+            x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
+            conv_inps = (x_4d, [], [])
+            final_conv_layer, conv_weights, conv_biases = combine_layers(create_conv_layer, dropout_rate, conv_layer_defs, conv_inps)
+            init_fc_layer = flatten_conv_layer(final_conv_layer)
+            penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), conv_weights)))
+        else:
+            init_fc_layer = x
+        
+        # define fully connected hidden layers and final softmax layer
+        fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation)
+        fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, False])
+        fc_inps = (init_fc_layer, [], [])
+        logits, fc_weights, fc_biases = combine_layers(create_fc_layer, dropout_rate, fc_layer_defs, fc_inps)
+        y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
+        _ = tf.histogram_summary('y', y)
+        penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), fc_weights)))
+         
+        # set up objective function and items to measure
+        loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
+        train_step = tracked_train_step(loss, learning_rate)
+        _ = tf.scalar_summary('loss', loss)
+        
+        correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        _ = tf.scalar_summary('accuracy', accuracy)
 
-            # set up objective function and items to measure
-            loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
-            train_step = tracked_train_step(loss, learning_rate)
-            _ = tf.scalar_summary('loss', loss)
-            
-            correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            _ = tf.scalar_summary('accuracy', accuracy)
+        for k, v in performance_funcs.items():
+            performance_funcs[k] = v(logits, y, y_, returns_)
+            _ = tf.scalar_summary(k, performance_funcs[k])                
 
-            for k, v in performance_funcs.items():
-                performance_funcs[k] = v(logits, y, y_, returns_)
-                _ = tf.scalar_summary(k, performance_funcs[k])                
+        # record training statistics
+        if logdir:
+            summary_op = tf.merge_all_summaries()
+            summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
+        
 
-            # record training statistics
-            if logdir:
-                summary_op = tf.merge_all_summaries()
-                summary_writer = tf.train.SummaryWriter(logdir, graph_def=sess.graph_def)
-            
+        # train on batches
+        start_time = time.time()
+        init = tf.initialize_all_variables()
+        sess.run(init)
+        train_feed_dict={x: Xs_train, y_: ys_train, returns_: returns_train}
+        test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test}
+        for i in xrange(iterations):
+            bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
+            batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets}
+            _, train_loss_value = sess.run([train_step, loss], feed_dict=batch_train_feed_dict)
+            if verbosity and i % verbosity == 0:
+                test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
+                
+                duration = time.time() - start_time
+                msg = 'step {0:>7}:\ttrain loss: {1:.5f}\ttest loss: {2:.5f}\t({3:.2f} sec)\n\t\t'
+                msg = msg.format(i, train_loss_value, test_loss_value, duration)
+                if performance_funcs:
+                    for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
+                        for k, v in performance_funcs.items():
+                            res = sess.run(v, feed_dict=j[1])
+                            msg += '{0} {1}: {2:.5f}\t'.format(j[0], k, res)
+                    msg += '\n'
+                print msg
 
-            # train on batches
-            start_time = time.time()
-            init = tf.initialize_all_variables()
-            sess.run(init)
-            train_feed_dict={x: Xs_train, y_: ys_train, returns_: returns_train}
-            test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test}
-            for i in xrange(iterations):
-                bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
-                batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets}
-                _, train_loss_value = sess.run([train_step, loss], feed_dict=batch_train_feed_dict)
-                if verbosity and i % verbosity == 0:
-                    test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
-                    
-                    duration = time.time() - start_time
-                    msg = 'step {0:>7}:\ttrain loss: {1:.5f}\ttest loss: {2:.5f}\t({3:.2f} sec)\n\t\t'
-                    msg = msg.format(i, train_loss_value, test_loss_value, duration)
-                    if performance_funcs:
-                        for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
-                            for k, v in performance_funcs.items():
-                                res = sess.run(v, feed_dict=j[1])
-                                msg += '{0} {1}: {2:.5f}\t'.format(j[0], k, res)
-                        msg += '\n'
-                    print msg
+                if logdir:
+                    summary_str = sess.run(summary_op, feed_dict=batch_train_feed_dict)
+                    summary_writer.add_summary(summary_str, i)     
+        
+        # calc model predictions and summary stats
+        predictions, stats = {}, {}
+        prediction = tf.argmax(y,1)
+        for i in (('train', train_feed_dict), ('test', test_feed_dict)):
+            try: 
+                preds_res = sess.run([prediction, y], i[1])
+                stats_res = sess.run([accuracy, loss], i[1])
+            except:
+                preds_res = np.nan, np.nan
+                stats_res = np.nan, np.nan
+            predictions[i[0]] = {'labels': preds_res[0], 'weights': preds_res[1]} 
+            stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
+        
+        msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
+        print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
+        msg = 'train loss:\t{0:.5f}\ttest loss:\t{1:.5f}'
+        print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
 
-                    if logdir:
-                        summary_str = sess.run(summary_op, feed_dict=batch_train_feed_dict)
-                        summary_writer.add_summary(summary_str, i)     
-            
-            # calc model predictions and summary stats
-            predictions, stats = {}, {}
-            prediction = tf.argmax(y,1)
-            for i in (('train', train_feed_dict), ('test', test_feed_dict)):
-                try: 
-                    preds_res = sess.run([prediction, y], i[1])
-                    stats_res = sess.run([accuracy, loss], i[1])
-                except:
-                    preds_res = np.nan, np.nan
-                    stats_res = np.nan, np.nan
-                predictions[i[0]] = {'labels': preds_res[0], 'weights': preds_res[1]} 
-                stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
-            
-            msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
-            print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
-            msg = 'train loss:\t{0:.5f}\ttest loss:\t{1:.5f}'
-            print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
-
-            return predictions, stats
+        return predictions, stats

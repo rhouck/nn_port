@@ -4,7 +4,8 @@ import datetime
 
 import pandas as pd
 import numpy as np
-from toolz.curried import pipe, map, filter
+from toolz.curried import pipe, filter
+from toolz.curried import map as cmap
 from toolz.dicttoolz import merge
 
 
@@ -38,7 +39,7 @@ def concat_dfs_by_date(date, obs):
 def create_2d_features(date_index, obs):
     p = pipe(date_index,
              filter(lambda x: date_in_each_index(x, obs)),
-             map(lambda x: (x, concat_dfs_by_date(x, obs))))
+             cmap(lambda x: (x, concat_dfs_by_date(x, obs))))
     return pd.Panel(dict(p))
 
 def clear_path(path):
@@ -89,4 +90,7 @@ def split_inputs_by_date(inps, split_date, buffer_periods):
     
     inps_train = [i.iloc[:train_split_ind] for i in inps]
     inps_test = [i.iloc[test_split_ind:] for i in inps]
-    return zip(inps_train, inps_test)
+    inps = zip(inps_train, inps_test)
+    inps = map(lambda x: list(x), inps)
+
+    return inps
