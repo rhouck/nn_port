@@ -205,7 +205,8 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                 bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
                 batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets, dropout_rate: train_dropout_rate}
                 _, train_loss_value = sess.run([train_step, loss], feed_dict=batch_train_feed_dict)
-                if verbosity and i % verbosity == 0:
+                if verbosity and i % verbosity == 0 and i > 0:
+
                     test_loss_value = sess.run(loss, feed_dict=test_feed_dict) if Xs_test.any() else np.nan
                     
                     duration = time.time() - start_time
