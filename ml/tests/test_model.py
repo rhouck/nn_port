@@ -121,7 +121,7 @@ class TestFCModel(unittest.TestCase):
 
     def test_high_regularization_pentalty_leads_to_near_zero_holdings_for_sigmoid_output_layer(self):
         inp = self.ys_labels.astype(np.float32).values
-        preds, stats = md.train_nn([[inp], [inp]], [[],[]], 2000, 1000, .1, penalty_alpha=15.,
+        preds, stats = md.train_nn([[inp], [inp]], [[],[]], 2000, 1000, .1, penalty_alpha=25.,
                                            fc_final_layer_activation=tf.sigmoid, verbosity=1000)
         self.assertTrue(abs(pd.DataFrame(preds['train']['weights']).stack().mean() - .5) < 1e-3)
     

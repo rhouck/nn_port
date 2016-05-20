@@ -81,17 +81,16 @@ def split_inputs_by_date(inps, split_date, buffer_periods):
     """splits Xs and ys by 'split_date' - 'buffer_periods'"""
     dates = sorted(set(get_date_index(inps[0])))
     date_ind = pd.Series(dates, index=dates)
-
+   
     try:
         test_split_date = date_ind[split_date:][0]
         test_split_ind = date_ind.tolist().index(test_split_date)
+        train_split_ind = test_split_ind - buffer_periods -1 
+        train_split_date = date_ind.iloc[train_split_ind]
     except:
-        test_split_date = date_ind.iloc[-1]
-        test_split_ind = date_ind.shape[0]
-        
-    train_split_ind = test_split_ind - buffer_periods
-    train_split_date = date_ind.iloc[train_split_ind]
-
+        train_split_date = split_date        
+        test_split_date = split_date       
+    
     inps_train = [i[:train_split_date] for i in inps]
     inps_test = [i[test_split_date:] for i in inps]
     inps = zip(inps_train, inps_test)

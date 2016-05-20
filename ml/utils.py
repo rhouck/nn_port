@@ -7,6 +7,12 @@ from toolz.curried import pipe, map
 sigmoid = lambda x: 1. / (1. + math.exp(-x))
 from_sigmoid = lambda x: -1. * math.log((1 / x) - 1)
 
+def ts_score(df):
+    """full sample ts score"""
+    mean = df.mean(axis=0)
+    std = df.std(axis=0)
+    return (df.sub(mean, axis=1)).div(std, axis=1)
+
 def get_num_per_p_year(df):
     df = df.dropna(how='all')
     pers = df.shape[0]
