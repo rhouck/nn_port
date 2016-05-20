@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 
-def calc_batch_ir(logits, y, y_, returns_):
-    q = 252.
+def calc_batch_ir(logits, y, y_, returns_, return_per_days):
+    q = 252. / return_per_days
     returns = tf.reduce_sum(tf.mul(returns_, y), 1)    
     returns_mean = tf.reduce_mean(returns)
     sum_squares = tf.reduce_sum(tf.square(tf.sub(returns, returns_mean)))
@@ -12,20 +12,25 @@ def calc_batch_ir(logits, y, y_, returns_):
     ann_returns_mean = returns_mean * q
     return ann_returns_mean / ann_std_dev
 
+def calc_net_holdings(logits, y, y_, returns_):
+    return tf.reduce_sum(y, 1)
+
 def calc_gearing(logits, y, y_, returns_):
     abs_holdings = tf.abs(y) / 2.
-    return tf.reduce_mean(tf.reduce_sum(abs_holdings, 1))
-
-def sigmoid_ir(logits, y, y_, returns_, activation):
+    return tf.reduce_sum(abs_holdings, 1)
+    
+def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, gain, holdings_penalty_alpha, gearing_alpha):
     with tf.name_scope('sigmoid_ir'):
-        
-        ir = calc_batch_ir(logits, y, y_, returns_)
-        sigmoid_ir = tf.sigmoid(-.3 * ir) * .5
-        
-        net_holdings = tf.reduce_mean(tf.reduce_sum(y, 1))
-        holdings_diff = tf.abs(0. - net_holdings) * 1.
+
+        # max net holdings penalty
+        max_net_holdings = tf.reduce_max(tf.abs(calc_net_holdings(logits, y, y_, returns_)))
+        holdings_penalty = 1. - tf.minimum(.99, max_net_holdings * holdings_penalty_alpha)
+        ir = calc_batch_ir(logits, y, y_, returns_, return_per_days)
+        ir_scaled = ir * holdings_penalty
+        sigmoid_ir = tf.sigmoid(-gain * ir_scaled)
         
         gearing = calc_gearing(logits, y, y_, returns_)
-        gearing_diff = tf.abs(1. - gearing) * 1.
+        avg_gearing = tf.reduce_mean(gearing)
+        gearing_diff = tf.square(1. - avg_gearing) * gearing_alpha
         
-        return sigmoid_ir + holdings_diff + gearing_diff
+        return sigmoid_ir + gearing_diff

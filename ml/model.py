@@ -52,18 +52,14 @@ def get_initial_weights_and_biases(weights_dim, activation):
     biases = tf.Variable(biases, name='biases')
     return weights, biases
 
-def create_fc_layer(input, name, out_size, activation, add_biases=True):
+def create_fc_layer(input, name, out_size, activation):
     with tf.name_scope(name):
         in_size = int(input._shape[1])
         weights_dim =[in_size, out_size]
         weights, biases = get_initial_weights_and_biases(weights_dim, activation)
         _ = tf.histogram_summary(name + '_weights', weights)
-        logits = tf.matmul(input, weights)
-        if add_biases:
-            _ = tf.histogram_summary(name + '_biases', biases)
-            logits += biases
-        else:
-            biases = None
+        _ = tf.histogram_summary(name + '_biases', biases)
+        logits = tf.matmul(input, weights) + biases
         response = activation(logits) if activation else logits
         return response, weights, biases
 
@@ -169,7 +165,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             
             # define fully connected hidden layers and final softmax layer
             fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation)
-            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None, False])
+            fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None])
             fc_inps = (init_fc_layer, [], [])
             logits, fc_weights, fc_biases = combine_layers(create_fc_layer, dropout_rate, fc_layer_defs, fc_inps)
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
@@ -213,11 +209,11 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                     msg = 'step {0:>7}:\ttrain loss: {1:.5f}\ttest loss: {2:.5f}\t({3:.2f} sec)\n\t\t'
                     msg = msg.format(i, train_loss_value, test_loss_value, duration)
                     if performance_funcs:
-                        for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
-                            for k, v in performance_funcs.items():
+                        for k, v in performance_funcs.items():
+                            for j in (('train', batch_train_feed_dict), ('test', test_feed_dict)):
                                 res = sess.run(v, feed_dict=j[1])
                                 msg += '{0} {1}: {2:.5f}\t'.format(j[0], k, res)
-                        msg += '\n'
+                            msg += '\n\t\t'
                     print msg
 
                     if logdir:
@@ -237,8 +233,8 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                 predictions[i[0]] = {'labels': preds_res[0], 'weights': preds_res[1]} 
                 stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
             
-            msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
-            print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
+            # msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
+            # print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
             msg = 'train loss:\t{0:.5f}\ttest loss:\t{1:.5f}'
             print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
 

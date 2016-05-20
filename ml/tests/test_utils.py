@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 import ml.utils as ut
-from ml.constructions import ts_score
+from tf.ml.constructions import ts_score
 
 
 class TestUtils(unittest.TestCase):

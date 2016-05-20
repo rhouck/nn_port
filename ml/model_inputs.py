@@ -79,17 +79,21 @@ def validate_and_format_inputs(*inps):
 
 def split_inputs_by_date(inps, split_date, buffer_periods):
     """splits Xs and ys by 'split_date' - 'buffer_periods'"""
-    date_ind = get_date_index(inps[0]).to_series()
+    dates = sorted(set(get_date_index(inps[0])))
+    date_ind = pd.Series(dates, index=dates)
+
     try:
         test_split_date = date_ind[split_date:][0]
         test_split_ind = date_ind.tolist().index(test_split_date)
     except:
+        test_split_date = date_ind.iloc[-1]
         test_split_ind = date_ind.shape[0]
         
     train_split_ind = test_split_ind - buffer_periods
-    
-    inps_train = [i.iloc[:train_split_ind] for i in inps]
-    inps_test = [i.iloc[test_split_ind:] for i in inps]
+    train_split_date = date_ind.iloc[train_split_ind]
+
+    inps_train = [i[:train_split_date] for i in inps]
+    inps_test = [i[test_split_date:] for i in inps]
     inps = zip(inps_train, inps_test)
     inps = map(lambda x: list(x), inps)
 
