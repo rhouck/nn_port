@@ -231,11 +231,11 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                     preds_res = np.nan, np.nan
                     stats_res = np.nan, np.nan
                 predictions[i[0]] = {'labels': preds_res[0], 'weights': preds_res[1]} 
-                stats[i[0]] = {'accuracy': stats_res[0], 'cross_entropy': stats_res[1]}
+                stats[i[0]] = {'accuracy': stats_res[0], 'loss': stats_res[1]}
             
             # msg = 'train accuracy:\t{0:.2f}\ttest accuracy:\t{1:.2f}'
             # print(msg.format(stats['train']['accuracy'], stats['test']['accuracy']))
             msg = 'train loss:\t{0:.5f}\ttest loss:\t{1:.5f}'
-            print(msg.format(stats['train']['cross_entropy'], stats['test']['cross_entropy']))
+            print(msg.format(stats['train']['loss'], stats['test']['loss']))
 
             return predictions, stats

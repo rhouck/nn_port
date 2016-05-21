@@ -14,7 +14,8 @@ def load_returns(fn, anti_signals=False):
 
 def get_fwd_ret(df, look_ahead_per):
     df_1 = df.applymap(lambda x: x + 1.)
-    return pd.rolling_apply(df_1[::-1], look_ahead_per, lambda x : x.prod())[::-1]
+    df_1 = pd.rolling_apply(df_1[::-1], look_ahead_per, lambda x : x.prod())[::-1]
+    return df_1.applymap(lambda x: x - 1.)
 
 def df_to_corr_panel(Xs):
     return (pd.Panel({i: Xs.apply(lambda x: gen_correlated_series(x, .05)) for i in range(5)})
@@ -36,3 +37,8 @@ def add_cash(df):
     cash = np.random.randn(df.shape[0]) * 1e-10
     cash =  pd.Series(cash, name='cash', index=df.index)
     return pd.concat([df, cash], axis=1)
+
+def load_scores(fn, anti_signals=False):
+    return (pd.read_hdf(fn, 'table')
+              .swapaxes('items', 'major_axis')
+              .swapaxes('minor_axis', 'major_axis'))
