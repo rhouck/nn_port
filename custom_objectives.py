@@ -35,4 +35,4 @@ def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, gain, geari
         avg_gearing = tf.reduce_mean(gearing)
         gearing_diff = tf.square(1. - avg_gearing) * gearing_alpha
         
-        return sigmoid_ir + gearing_diff
+        return 2. * sigmoid_ir + gearing_diff

@@ -35,6 +35,10 @@ def calc_annual_turnover(df):
     to = calc_turnover(df)
     return to.mean() * get_num_per_p_year(df)
 
+def calc_gearing(df):
+    abs_holdings = df.abs() / 2.
+    return abs_holdings.sum(axis=1)
+
 def get_mean_var_tilt_holdings(df, halflife=24*22):
     alphas = np.ones(df.shape[1])
     cov_pn = pd.ewmcov(df, halflife=halflife, min_periods=halflife / 4).dropna(how='all')
