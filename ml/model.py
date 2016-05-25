@@ -141,6 +141,16 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
         conv_struct = None
         fc_struct = structure
 
+    if not isinstance(train_dropout_rate, list):
+        train_dropout_rate = [train_dropout_rate,]
+    if len(train_dropout_rate) == 1:
+        train_conv_dropout_rate = train_dropout_rate[0]
+        train_fc_dropout_rate = train_dropout_rate[0]
+    else:
+        train_conv_dropout_rate = train_dropout_rate[0]
+        train_fc_dropout_rate = train_dropout_rate[1]
+
+
     penalties = []
     with tf.Graph().as_default():
         with tf.Session() as sess:           
@@ -150,14 +160,15 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             returns_ = tf.placeholder(tf.float32, [None, returns_train.shape[1]], name='returns_')
             Xs_shape = [None] + list(Xs_train.shape[1:])
             x = tf.placeholder(tf.float32, Xs_shape, name='x')
-            dropout_rate = tf.placeholder("float")
+            conv_dropout_rate = tf.placeholder("float")
+            fc_dropout_rate = tf.placeholder("float")
 
             # define and create convolution layers if needed
             if conv_struct:
                 conv_layer_defs = define_layers('conv_layer', conv_struct, conv_layer_activation)
                 x_4d = tf.reshape(x, [-1, Xs_shape[1], Xs_shape[2], 1])
                 conv_inps = (x_4d, [], [])
-                final_conv_layer, conv_weights, conv_biases = combine_layers(create_conv_layer, dropout_rate, conv_layer_defs, conv_inps)
+                final_conv_layer, conv_weights, conv_biases = combine_layers(create_conv_layer, conv_dropout_rate, conv_layer_defs, conv_inps)
                 init_fc_layer = flatten_conv_layer(final_conv_layer)
                 penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), conv_weights)))
             else:
@@ -167,7 +178,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             fc_layer_defs = define_layers('fully_connected_hidden', fc_struct, fc_hidden_layer_activation)
             fc_layer_defs.append(['fully_connected_final_layer', ys_train.shape[1], None])
             fc_inps = (init_fc_layer, [], [])
-            logits, fc_weights, fc_biases = combine_layers(create_fc_layer, dropout_rate, fc_layer_defs, fc_inps)
+            logits, fc_weights, fc_biases = combine_layers(create_fc_layer, fc_dropout_rate, fc_layer_defs, fc_inps)
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
             penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), fc_weights)))
@@ -195,11 +206,11 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             start_time = time.time()
             init = tf.initialize_all_variables()
             sess.run(init)
-            train_feed_dict={x: Xs_train, y_: ys_train, returns_: returns_train, dropout_rate: 0.}
-            test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test, dropout_rate: 0.}
+            train_feed_dict={x: Xs_train, y_: ys_train, returns_: returns_train, conv_dropout_rate: 0., fc_dropout_rate: 0.}
+            test_feed_dict={x: Xs_test, y_: ys_test, returns_: returns_test, conv_dropout_rate: 0., fc_dropout_rate: 0.}
             for i in xrange(iterations):
                 bXs, bys, brets = get_batch(Xs_train, ys_train, returns_train, batch_size)
-                batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets, dropout_rate: train_dropout_rate}
+                batch_train_feed_dict = {x: bXs, y_: bys, returns_: brets, conv_dropout_rate: train_conv_dropout_rate, fc_dropout_rate: train_fc_dropout_rate}
                 _, train_loss_value = sess.run([train_step, loss], feed_dict=batch_train_feed_dict)
                 if verbosity and i % verbosity == 0 and i > 0:
 
