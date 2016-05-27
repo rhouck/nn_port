@@ -39,14 +39,14 @@ def tracked_train_step(loss, learning_rate):
     return train_step
 
 def get_initial_weights_and_biases(weights_dim, activation):
-    stddev = 1.0 / math.sqrt(float(weights_dim[-2]))
     if activation is None or activation.__name__ == 'sigmoid':
+        stddev = 1.0 / math.sqrt(float(weights_dim[-2]))
         weights = tf.random_normal(weights_dim, stddev=stddev)
         biases = tf.zeros([weights_dim[-1]])
     elif activation.__name__ == 'relu':
-        stddev = math.sqrt(2.) * stddev
+        stddev = math.sqrt(2.0 / float(weights_dim[-2]))
         weights = tf.truncated_normal(weights_dim, stddev=stddev)
-        biases = tf.constant(.1, shape=[weights_dim[-1]])
+        biases = tf.constant(.01, shape=[weights_dim[-1]])
     else:
         raise Exception('get init weights not yet implemented for this activation')
     weights = tf.Variable(weights, name='weights')
@@ -105,6 +105,17 @@ def flatten_conv_layer(layer):
     height = layer._shape[1]._value
     return tf.reshape(layer, [-1, depth*width*height])
 
+def split_fc_conv_input(inp):
+    if not isinstance(inp, list):
+        inp = [inp,]
+    if len(inp) == 1:
+        conv = inp[0]
+        fc = inp[0]
+    else:
+        conv = inp[0]
+        fc = inp[1]
+    return conv, fc
+
 def train_nn(data, structure, iterations, batch_size, learning_rate, 
              penalty_alpha=0., 
              train_dropout_rate=0., 
@@ -142,16 +153,9 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
         conv_struct = None
         fc_struct = structure
 
-    if not isinstance(train_dropout_rate, list):
-        train_dropout_rate = [train_dropout_rate,]
-    if len(train_dropout_rate) == 1:
-        train_conv_dropout_rate = train_dropout_rate[0]
-        train_fc_dropout_rate = train_dropout_rate[0]
-    else:
-        train_conv_dropout_rate = train_dropout_rate[0]
-        train_fc_dropout_rate = train_dropout_rate[1]
-
-
+    conv_penalty_alpha, fc_penalty_alpha = split_fc_conv_input(penalty_alpha)
+    train_conv_dropout_rate, train_fc_dropout_rate = split_fc_conv_input(train_dropout_rate)
+    
     penalties = []
     with tf.Graph().as_default():
         with tf.Session() as sess:           
@@ -171,7 +175,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                 conv_inps = (x_4d, [], [])
                 final_conv_layer, conv_weights, conv_biases = combine_layers(create_conv_layer, conv_dropout_rate, conv_layer_defs, conv_inps)
                 init_fc_layer = flatten_conv_layer(final_conv_layer)
-                penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), conv_weights)))
+                penalties.append(sum(map(lambda x: get_penalties(x, conv_penalty_alpha), conv_weights)))
             else:
                 init_fc_layer = x
             
@@ -182,7 +186,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             logits, fc_weights, fc_biases = combine_layers(create_fc_layer, fc_dropout_rate, fc_layer_defs, fc_inps)
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
-            penalties.append(sum(map(lambda x: get_penalties(x, penalty_alpha), fc_weights)))
+            penalties.append(sum(map(lambda x: get_penalties(x, fc_penalty_alpha), fc_weights)))
              
             # set up objective function and items to measure
             loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
