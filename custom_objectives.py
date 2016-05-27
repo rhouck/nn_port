@@ -19,15 +19,30 @@ def calc_gearing(logits, y, y_, returns_):
     abs_holdings = tf.abs(y) / 2.
     return tf.reduce_sum(abs_holdings, 1)
     
-def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, gain, holdings_gain, gearing_alpha):
+def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, gain, holdings_gain, gearing_alpha, mean):
     with tf.name_scope('sigmoid_ir'):
 
-        # max net holdings penalty
-        max_net_holdings = tf.reduce_max(tf.abs(calc_net_holdings(logits, y, y_, returns_)))
+        net_holdings = calc_net_holdings(logits, y, y_, returns_)
+        
+        if mean:        
+            # get average positive net holdings
+            zeros = tf.zeros(tf.to_int32(tf.shape(net_holdings)), dtype=tf.float32)
+            max_net_holdings = tf.reduce_mean(tf.maximum(net_holdings, zeros))
+        else:
+            # get max positive net holdings
+            max_net_holdings = tf.maximum(0., tf.reduce_max(net_holdings))
+        
+        # get average non-zero holdings
+        #max_net_holdings = tf.reduce_mean(tf.abs(net_holdings))
+        
+        # get max non-zero holdings
+        #max_net_holdings = tf.reduce_max(tf.abs(net_holdings))
+        
         holdings_lim_1 = max_net_holdings / (tf.abs(max_net_holdings) + holdings_gain)
         holdings_penalty = 1. - holdings_lim_1
-        #holdings_penalty = 1. - tf.minimum(.99, max_net_holdings * holdings_penalty_alpha)
+        
         ir = calc_batch_ir(logits, y, y_, returns_, return_per_days)
+        
         ir_scaled = ir * holdings_penalty
         sigmoid_ir = tf.sigmoid(-gain * ir_scaled)
         
