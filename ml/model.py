@@ -44,9 +44,9 @@ def get_initial_weights_and_biases(weights_dim, activation):
         weights = tf.random_normal(weights_dim, stddev=stddev)
         biases = tf.zeros([weights_dim[-1]])
     elif activation.__name__ == 'relu':
-        stddev = math.sqrt(2.0 / float(weights_dim[-2]))
+        stddev = math.sqrt(1.0 / float(weights_dim[-2]))
         weights = tf.truncated_normal(weights_dim, stddev=stddev)
-        biases = tf.constant(.01, shape=[weights_dim[-1]])
+        biases = tf.constant(.1, shape=[weights_dim[-1]])
     else:
         raise Exception('get init weights not yet implemented for this activation')
     weights = tf.Variable(weights, name='weights')
