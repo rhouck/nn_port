@@ -17,8 +17,8 @@ def get_fwd_ret(df, look_ahead_per):
     df_1 = pd.rolling_apply(df_1[::-1], look_ahead_per, lambda x : x.prod())[::-1]
     return df_1.applymap(lambda x: x - 1.)
 
-def df_to_corr_panel(Xs):
-    return (pd.Panel({i: Xs.apply(lambda x: gen_correlated_series(x, .05)) for i in range(5)})
+def df_to_corr_panel(Xs, corr, width):
+    return (pd.Panel({i: Xs.apply(lambda x: gen_correlated_series(x, corr)) for i in range(width)})
             .swapaxes('items', 'major_axis')
             .swapaxes('major_axis', 'minor_axis'))
 
