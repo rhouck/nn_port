@@ -39,12 +39,11 @@ def tracked_train_step(loss, learning_rate):
     return train_step
 
 def get_initial_weights_and_biases(weights_dim, activation):
+    stddev = math.sqrt(1.0 / float(weights_dim[-2]))
     if activation is None or activation.__name__ == 'sigmoid':
-        stddev = 1.0 / math.sqrt(float(weights_dim[-2]))
         weights = tf.random_normal(weights_dim, stddev=stddev)
         biases = tf.zeros([weights_dim[-1]])
-    elif activation.__name__ == 'relu':
-        stddev = math.sqrt(1.0 / float(weights_dim[-2]))
+    elif activation.__name__ == 'relu':  
         weights = tf.truncated_normal(weights_dim, stddev=stddev)
         biases = tf.constant(.1, shape=[weights_dim[-1]])
     else:
