@@ -18,48 +18,33 @@ def calc_net_holdings(logits, y, y_, returns_):
 def calc_gearing(logits, y, y_, returns_):
     abs_holdings = tf.abs(y) / 2.
     return tf.reduce_sum(abs_holdings, 1)
+    # zeros = tf.zeros(tf.to_int32(tf.shape(y)), dtype=tf.float32)
+    # pos_holdings = tf.maximum(y, zeros)
+    # return tf.reduce_sum(pos_holdings, 1)
+
+def calc_discount(metric, mean, gain):
+    if mean:
+        sel_metric = tf.reduce_mean(metric)
+    else:
+        sel_metric = tf.reduce_max(metric)
+    #lim_1 = tf.tanh(sel_metric)
+    lim_1 = sel_metric / (tf.abs(sel_metric) + gain)
+    return 1. - lim_1
     
-def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, gain, holdings_gain, gearing_alpha, mean, pos, pen_tilt):
+def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, sigmoid_gain, holdings_gain, gearing_gain, tilt_gain, mean):
     with tf.name_scope('sigmoid_ir'):
 
         net_holdings = calc_net_holdings(logits, y, y_, returns_)
-        #demeaned_holdings = tf.sub(y, tf.expand_dims(net_holdings, 1))
-        
-        if mean and pos:        
-            # get average positive net holdings
-            zeros = tf.zeros(tf.to_int32(tf.shape(net_holdings)), dtype=tf.float32)
-            max_net_holdings = tf.reduce_mean(tf.maximum(net_holdings, zeros))
-        elif not mean and pos:
-            # get max positive net holdings
-            max_net_holdings = tf.maximum(0., tf.reduce_max(net_holdings))
-        elif mean and not pos:
-            # get average non-zero holdings
-            max_net_holdings = tf.reduce_mean(tf.abs(net_holdings))
-        else:
-            # get max non-zero holdings
-            max_net_holdings = tf.reduce_max(tf.abs(net_holdings))
-        
-        holdings_lim_1 = max_net_holdings / (tf.abs(max_net_holdings) + holdings_gain)
-        holdings_penalty = 1. - holdings_lim_1
-        
-        if pen_tilt:
-            tilts = tf.reduce_mean(y, 0)
-            if mean:
-                max_tilt = tf.reduce_mean(tf.abs(tilts))
-            else:
-                max_tilt = tf.reduce_max(tf.abs(tilts))
-            tilt_lim_1 = max_tilt / (tf.abs(max_tilt) + holdings_gain)
-            tilt_penalty = 1. - tilt_lim_1
-
-        #ir = calc_batch_ir(logits, demeaned_holdings, y_, returns_, return_per_days)
-        ir = calc_batch_ir(logits, y, y_, returns_, return_per_days)
-        ir_scaled = ir * holdings_penalty
-        if pen_tilt:
-            ir_scaled *= tilt_penalty
-        sigmoid_ir = tf.sigmoid(-gain * ir_scaled)
-
         gearing = calc_gearing(logits, y, y_, returns_)
-        avg_gearing = tf.reduce_mean(gearing)
-        gearing_diff = tf.square(1. - avg_gearing) * gearing_alpha
+        #gearing_error = tf.abs(1. - gearing)
+        gearing_ratio = tf.abs(net_holdings) / gearing
+        tilts = tf.reduce_mean(y, 0)
+
+        net_holdings_discount = calc_discount(net_holdings, mean, holdings_gain)
+        #gearing_discount = calc_discount(gearing_error, mean, gearing_gain)  
+        gearing_discount = calc_discount(gearing_ratio, mean, gearing_gain)
+        tilt_discount = calc_discount(tilts, mean, tilt_gain)
         
-        return 2. * sigmoid_ir + gearing_diff
+        ir = calc_batch_ir(logits, y, y_, returns_, return_per_days)
+        ir_scaled = ir * net_holdings_discount * gearing_discount * tilt_discount
+        return tf.sigmoid(sigmoid_gain * -ir_scaled)
