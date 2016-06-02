@@ -38,7 +38,8 @@ def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, sigmoid_gai
         gearing = calc_gearing(logits, y, y_, returns_)
         #gearing_error = tf.abs(1. - gearing)
         gearing_ratio = tf.abs(net_holdings) / gearing
-        tilts = tf.reduce_mean(y, 0)
+        tilts = tf.abs(tf.reduce_mean(y, 0))
+        #tilts = tf.reduce_mean(y, 0)
 
         net_holdings_discount = calc_discount(net_holdings, mean, holdings_gain)
         #gearing_discount = calc_discount(gearing_error, mean, gearing_gain)  
