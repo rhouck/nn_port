@@ -125,6 +125,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
              fc_hidden_layer_activation=tf.sigmoid, 
              fc_final_layer_activation=tf.nn.softmax,
              loss_func=calc_loss,
+             train_step_func=tracked_train_step,
              performance_funcs={}):
     """train model on train set, test on train test set
     Xs and ys: lists contaiing train set and optionally a test set
@@ -190,7 +191,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
              
             # set up objective function and items to measure
             loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
-            train_step = tracked_train_step(loss, learning_rate)
+            train_step = train_step_func(loss, learning_rate)
             _ = tf.scalar_summary('loss', loss)
             
             correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))

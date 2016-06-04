@@ -18,9 +18,6 @@ def calc_net_holdings(logits, y, y_, returns_):
 def calc_gearing(logits, y, y_, returns_):
     abs_holdings = tf.abs(y) / 2.
     return tf.reduce_sum(abs_holdings, 1)
-    # zeros = tf.zeros(tf.to_int32(tf.shape(y)), dtype=tf.float32)
-    # pos_holdings = tf.maximum(y, zeros)
-    # return tf.reduce_sum(pos_holdings, 1)
 
 def calc_discount(metric, mean, gain):
     if mean:
@@ -39,7 +36,6 @@ def sigmoid_ir(logits, y, y_, returns_, activation, return_per_days, sigmoid_gai
         #gearing_error = tf.abs(1. - gearing)
         gearing_ratio = tf.abs(net_holdings) / gearing
         tilts = tf.abs(tf.reduce_mean(y, 0))
-        #tilts = tf.reduce_mean(y, 0)
 
         net_holdings_discount = calc_discount(net_holdings, mean, holdings_gain)
         #gearing_discount = calc_discount(gearing_error, mean, gearing_gain)  
