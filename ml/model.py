@@ -44,6 +44,7 @@ def get_initial_weights_and_biases(weights_dim, activation):
         weights = tf.random_normal(weights_dim, stddev=stddev)
         biases = tf.zeros([weights_dim[-1]])
     elif activation.__name__ == 'relu':  
+        stddev *= math.sqrt(2.)
         weights = tf.truncated_normal(weights_dim, stddev=stddev)
         biases = tf.constant(.1, shape=[weights_dim[-1]])
     else:
