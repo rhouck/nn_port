@@ -9,10 +9,16 @@ def get_batch(Xs, ys, returns, batch_size):
     inds = np.random.choice(Xs.shape[0], batch_size, replace=True)
     return Xs[inds,:], ys[inds,:], returns[inds,:]
 
-def get_penalties(items, alpha):
+def get_penalties(items, alpha, norm):
     """returns penalties for a given set of weights or biases"""
-    penalties = tf.nn.l2_loss(items) * alpha
-    name = 'l2_{0}_pen'.format(items.name.split(':')[0])
+    if norm == 'l2':
+        penalties = tf.nn.l2_loss(items)
+    elif norm == 'l1':
+        penalties = tf.reduce_sum(tf.abs(items))
+    else:
+        raise ValueError('no penalty defined for norm: {0}'.format(norm))
+    penalties *= alpha
+    name = '{0}_{1}_pen'.format(norm, items.name.split(':')[0])
     _ = tf.histogram_summary(name, penalties)
     return penalties
 
@@ -117,6 +123,7 @@ def split_fc_conv_input(inp):
         fc = inp[1]
     return conv, fc
 
+
 def train_nn(data, structure, iterations, batch_size, learning_rate, 
              penalty_alpha=0., 
              train_dropout_rate=0., 
@@ -155,7 +162,10 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
         conv_struct = None
         fc_struct = structure
 
-    conv_penalty_alpha, fc_penalty_alpha = split_fc_conv_input(penalty_alpha)
+    conv_penalty, fc_penalty = split_fc_conv_input(penalty_alpha)
+    add_penalty_norm = lambda x: (x, 'l2') if not isinstance(x, (list, tuple)) else x
+    conv_penalty, fc_penalty = map(add_penalty_norm, (conv_penalty, fc_penalty))
+
     train_conv_dropout_rate, train_fc_dropout_rate = split_fc_conv_input(train_dropout_rate)
     
     penalties = []
@@ -177,7 +187,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
                 conv_inps = (x_4d, [], [])
                 final_conv_layer, conv_weights, conv_biases = combine_layers(create_conv_layer, conv_dropout_rate, conv_layer_defs, conv_inps)
                 init_fc_layer = flatten_conv_layer(final_conv_layer)
-                penalties.append(sum(map(lambda x: get_penalties(x, conv_penalty_alpha), conv_weights)))
+                penalties.append(sum(map(lambda x: get_penalties(x, *conv_penalty), conv_weights)))
             else:
                 init_fc_layer = x
             
@@ -188,7 +198,7 @@ def train_nn(data, structure, iterations, batch_size, learning_rate,
             logits, fc_weights, fc_biases = combine_layers(create_fc_layer, fc_dropout_rate, fc_layer_defs, fc_inps)
             y = fc_final_layer_activation(logits) if fc_final_layer_activation else logits
             _ = tf.histogram_summary('y', y)
-            penalties.append(sum(map(lambda x: get_penalties(x, fc_penalty_alpha), fc_weights)))
+            penalties.append(sum(map(lambda x: get_penalties(x, *fc_penalty), fc_weights)))
              
             # set up objective function and items to measure
             loss = loss_func(logits, y, y_, returns_, fc_final_layer_activation) + sum(penalties)
